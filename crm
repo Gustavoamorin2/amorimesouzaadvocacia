@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRM - AMR ADV</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #fff;
+      color: #333;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 20px;
+      background: #f7f7f7;
+      border-bottom: 1px solid #ddd;
+    }
+
+    header h1 {
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    header input {
+      padding: 6px 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    .kanban {
+      display: flex;
+      gap: 15px;
+      padding: 20px;
+      overflow-x: auto;
+    }
+
+    .column {
+      flex: 1;
+      min-width: 220px;
+      background: #fafafa;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    .column h2 {
+      font-size: 16px;
+      margin: 0 0 10px 0;
+      text-align: center;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+      cursor: grab;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>AMR ADV - CRM</h1>
+    <input type="text" placeholder="🔍 Buscar...">
+  </header>
+
+  <main class="kanban">
+    <div class="column">
+      <h2>Novo Lead</h2>
+      <div class="card">Cliente 1</div>
+      <div class="card">Cliente 2</div>
+    </div>
+
+    <div class="column">
+      <h2>Em andamento</h2>
+      <div class="card">Cliente 3</div>
+    </div>
+
+    <div class="column">
+      <h2>Proposta</h2>
+      <div class="card">Cliente 4</div>
+    </div>
+
+    <div class="column">
+      <h2>Fechado</h2>
+      <div class="card">Cliente 5</div>
+    </div>
+  </main>
+</body>
+</html>
