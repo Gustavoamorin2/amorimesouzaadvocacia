@@ -6,6 +6,7 @@
 <title>Processos - CRM AMR ADV</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600&display=swap" rel="stylesheet">
 <style>
+/* --- ESTILOS CSS --- */
 * { margin:0; padding:0; box-sizing:border-box; font-family: 'Segoe UI', sans-serif; }
 body { display:flex; background:#f0f2f5; height:100vh; overflow:hidden; transition:filter 0.3s; }
 
@@ -39,23 +40,33 @@ body { display:flex; background:#f0f2f5; height:100vh; overflow:hidden; transiti
 
 header { height:60px; background:#fff; border-bottom:1px solid #ddd; display:flex; justify-content:space-between; align-items:center; padding:0 20px; flex-shrink:0; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.05);}
 header h1 { font-size:22px; color:#1e1e2f; font-family:'Poppins', sans-serif; }
-header input { padding:6px 10px; border-radius:6px; border:1px solid #ccc; width:250px; }
 
 .kanban-container { flex:1; overflow-y:auto; padding:20px; }
 .kanban { display:flex; flex-wrap:wrap; gap:20px; }
-.card { display:flex; background:#fff; border-radius:15px; box-shadow:0 12px 30px rgba(0,0,0,0.12); cursor:pointer; overflow:hidden; transition:0.3s; min-height:160px; flex-direction:row; position:relative; width:320px; }
+.card { 
+    display:flex; background:#fff; border-radius:15px; box-shadow:0 12px 30px rgba(0,0,0,0.12); cursor:pointer; 
+    overflow:hidden; transition:0.3s; min-height:160px; flex-direction:row; position:relative; 
+    width:320px; 
+}
 .card:hover { transform:scale(1.03); }
 .card .color-bar { width:8px; height:100%; border-radius:15px 0 0 15px; }
 .card-content { padding:20px; flex:1; display:flex; flex-direction:column; justify-content:center; }
 .card h3 { font-size:20px; margin-bottom:6px; color:#333; }
 .card p { font-size:14px; color:#555; margin:3px 0; }
-.fechado .color-bar { background:#2ecc71; }
+/* Estilo para status 'fechado' */
+.fechado .color-bar { background:#2ecc71; } 
+/* Estilo para status 'andamento' - apenas para visualização de cores */
+.em-andamento .color-bar { background:#3498db; }
+/* Estilo para status 'aplicativo' */
+.aplicativo .color-bar { background:#e74c3c; }
 
 .modal-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.35); justify-content:center; align-items:center; z-index:50; }
 .modal { background:#fff; padding:18px; border-radius:15px; min-width:320px; max-width:500px; max-height:80vh; overflow-y:auto; box-shadow:0 8px 30px rgba(0,0,0,.25); }
 .modal h3 { margin-bottom:12px; }
 .modal .row { margin-bottom:20px; }
-.modal input { width:100%; padding:8px; border-radius:6px; border:1px solid #ccc; margin-top:4px; }
+.modal input, .modal select { 
+    width:100%; padding:8px; border-radius:6px; border:1px solid #ccc; margin-top:4px; 
+}
 .hist-container { margin-top:10px; display:flex; flex-direction:column; gap:6px; max-height:150px; overflow-y:auto; }
 .hist-card { background:#f1f3f5; padding:6px 10px; border-radius:10px; box-shadow:0 2px 4px rgba(0,0,0,0.1); font-size:14px; color:#333; display:flex; justify-content:space-between; }
 .hist-card span { font-size:12px; color:#888; margin-left:8px; }
@@ -66,9 +77,11 @@ header input { padding:6px 10px; border-radius:6px; border:1px solid #ccc; width
 </style>
 
 <script type="module">
+// --- CONFIGURAÇÃO E IMPORTS FIREBASE ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
 import { getFirestore, collection, getDocs, doc, updateDoc, getDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-firestore.js";
 
+// SUBSTITUA ESSAS CONFIGURAÇÕES PELAS SUAS
 const firebaseConfig = {
     apiKey: "AIzaSyAFJJAqVf3ge0WDHBpmS9E6sXKvnjuFkhw",
     authDomain: "dapapp-38637.firebaseapp.com",
@@ -80,95 +93,172 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const clientesContainer = document.getElementById("clientesContainer");
+// --- VARIÁVEIS GLOBAIS ---
+const processosContainer = document.getElementById("processosContainer");
 const modalBackdrop = document.getElementById("modalBackdrop");
 const modalTitle = document.getElementById("modalTitle");
 const processosForm = document.getElementById("processosForm");
-const processosContainer = document.getElementById("processosContainer");
+const kanbanContainer = document.getElementById("kanbanContainer"); // Onde os cards serão exibidos
 const header = document.querySelector("header");
 const mainContent = document.querySelector(".main");
 const sidebar = document.querySelector(".sidebar");
+
+// Estado
+let processoAtual = null; // Armazena o processo sendo editado
+let clienteAtualId = null; // Armazena o ID do cliente do processo
+let todosOsProcessos = []; // Lista plana de todos os processos de todos os clientes
 
 // Sidebar hover + blur
 sidebar.addEventListener('mouseenter', () => { sidebar.classList.add('expanded'); mainContent.classList.add('blur'); });
 sidebar.addEventListener('mouseleave', () => { sidebar.classList.remove('expanded'); mainContent.classList.remove('blur'); });
 
+// --- BUSCA E FILTRO DE PROCESSOS ---
+
 const searchInput = document.createElement("input");
 searchInput.id = "searchInput";
-searchInput.placeholder = "Pesquisar clientes...";
+searchInput.placeholder = "Pesquisar por cliente, processo ou classe...";
 searchInput.style.padding = "6px 10px";
 searchInput.style.borderRadius = "6px";
 searchInput.style.border = "1px solid #ccc";
 searchInput.style.width = "250px";
 header.appendChild(searchInput);
 
-let clienteAtual = null;
+// Função principal de carregamento
+async function carregarProcessos() {
+    kanbanContainer.innerHTML = "";
+    todosOsProcessos = []; // Limpa a lista global
 
-async function carregarClientes() {
-    clientesContainer.innerHTML = "";
-    const snapshot = await getDocs(collection(db,"clientes"));
-    snapshot.forEach(docSnap => {
-        const cliente = { id: docSnap.id, ...docSnap.data() };
-        if (cliente.status === "fechado") {
-            const card = document.createElement("div");
-            card.className = "card fechado";
-            card.onclick = () => abrirModal(cliente);
+    try {
+        const snapshot = await getDocs(collection(db, "clientes"));
+        
+        snapshot.forEach(docSnap => {
+            const cliente = { id: docSnap.id, ...docSnap.data() };
+            const arrayProcessos = cliente.processos; // Assume que o campo é 'processos' e é um Array
 
-            const colorBar = document.createElement("div");
-            colorBar.className = "color-bar";
-            card.appendChild(colorBar);
+            if (Array.isArray(arrayProcessos)) {
+                arrayProcessos.forEach((processo, index) => {
+                    // Adiciona o ID do cliente e o índice para referência futura
+                    const processoCompleto = { 
+                        ...processo, 
+                        clienteId: cliente.id, 
+                        clienteNome: cliente.nome || "Cliente Desconhecido",
+                        processoIndex: index // Guarda a posição no array para salvar a atualização
+                    };
+                    todosOsProcessos.push(processoCompleto);
+                });
+            }
+        });
+        
+        filtrarEExibirProcessos(); // Exibe os processos iniciais (filtrando por "fechado")
+    } catch (error) {
+        console.error("Erro ao carregar processos:", error);
+        kanbanContainer.innerHTML = "<p style='color:red;'>Erro ao carregar processos. Verifique o console.</p>";
+    }
+}
 
-            const content = document.createElement("div");
-            content.className = "card-content";
-            content.innerHTML = `
-                <h3>${cliente.nome}</h3>
-                <p>CPF: ${cliente.cpf||"-"}</p>
-                <p>Classe: ${cliente.classe||"-"}</p>
-                <p>Processo: ${cliente.processo||"-"}</p>
-            `;
-            card.appendChild(content);
+// Filtra e exibe os cards
+function filtrarEExibirProcessos() {
+    kanbanContainer.innerHTML = "";
+    const termo = searchInput.value.toLowerCase().trim();
+    
+    // Filtro principal: Apenas processos com andamento "fechado"
+    const processosFiltrados = todosOsProcessos.filter(p => 
+        p.andamento && p.andamento.toLowerCase() === "fechado"
+    );
 
-            clientesContainer.appendChild(card);
-        }
+    // Filtro de pesquisa (se houver termo)
+    const processosFinais = processosFiltrados.filter(p => {
+        const nome = p.clienteNome.toLowerCase();
+        const numero = p.numeroProcesso ? p.numeroProcesso.toLowerCase() : "";
+        const classe = p.classe ? p.classe.toLowerCase() : "";
+        
+        return nome.includes(termo) || numero.includes(termo) || classe.includes(termo);
+    });
+
+
+    if (processosFinais.length === 0 && termo === "") {
+        kanbanContainer.innerHTML = "<p>Nenhum processo com status 'fechado' encontrado.</p>";
+        return;
+    } else if (processosFinais.length === 0 && termo !== "") {
+         kanbanContainer.innerHTML = `<p>Nenhum processo 'fechado' encontrado para o termo "${termo}".</p>`;
+        return;
+    }
+
+
+    processosFinais.forEach(processo => {
+        const card = document.createElement("div");
+        // Adiciona a classe de status para a barra de cor
+        card.className = `card ${processo.andamento ? processo.andamento.toLowerCase().replace(/ /g, '-') : 'sem-status'}`;
+        card.onclick = () => abrirModal(processo); // Abre o modal para o processo
+
+        const colorBar = document.createElement("div");
+        colorBar.className = "color-bar";
+        card.appendChild(colorBar);
+
+        const content = document.createElement("div");
+        content.className = "card-content";
+        
+        // Exibe os campos solicitados
+        content.innerHTML = `
+            <h3>${processo.classe || "Classe Indefinida"}</h3>
+            <p>Cliente: <b>${processo.clienteNome}</b></p>
+            <p>Nº Proc.: ${processo.numeroProcesso || "-"}</p>
+            <p>Valor: R$ ${processo.valorCausa || "0,00"}</p>
+            <p>Andamento: ${processo.andamento || "Indefinido"}</p>
+        `;
+        card.appendChild(content);
+
+        kanbanContainer.appendChild(card);
     });
 }
 
-searchInput.addEventListener("input", () => {
-    const termo = searchInput.value.toLowerCase();
-    const cards = clientesContainer.querySelectorAll(".card");
-    cards.forEach(card => {
-        const nome = card.querySelector("h3").textContent.toLowerCase();
-        card.style.display = nome.includes(termo) ? "flex" : "none";
-    });
-});
+searchInput.addEventListener("input", filtrarEExibirProcessos);
 
-async function abrirModal(cliente) {
-    clienteAtual = cliente;
-    const docRef = doc(db,"clientes",cliente.id);
-    const docSnap = await getDoc(docRef);
-    const clienteData = docSnap.exists() ? docSnap.data() : {};
+// --- MODAL E EDIÇÃO ---
 
-    modalTitle.textContent = `Processos de ${cliente.nome}`;
-    processosContainer.innerHTML = "";
+async function abrirModal(processo) {
+    processoAtual = processo;
+    clienteAtualId = processo.clienteId;
+    modalTitle.textContent = `Processo ${processo.numeroProcesso || "Novo"} - ${processo.clienteNome}`;
+    
+    // Prepara o conteúdo do formulário (simplificado para HTML)
+    processosContainer.innerHTML = `
+        <div class="row">
+            <p><b>Número do Processo:</b></p>
+            <input type="text" id="inputNumProcesso" value="${processo.numeroProcesso || ''}" required/>
+        </div>
+        <div class="row">
+            <p><b>Classe:</b></p>
+            <input type="text" id="inputClasse" value="${processo.classe || ''}"/>
+        </div>
+        <div class="row">
+            <p><b>Valor da Causa:</b></p>
+            <input type="text" id="inputValorCausa" value="${processo.valorCausa || ''}"/>
+        </div>
+        <div class="row">
+            <p><b>Andamento (Status):</b></p>
+            <select id="inputAndamento">
+                <option value="fechado">Fechado</option>
+                <option value="andamento">Em Andamento</option>
+                <option value="aplicativo">Exibir no Aplicativo</option>
+                <option value="cancelado">Cancelado</option>
+            </select>
+            <small>Status atual: <b>${processo.andamento || 'Indefinido'}</b></small>
+        </div>
+        <div class="row">
+            <p><b>Nova Movimentação (Histórico):</b></p>
+            <input type="text" id="inputNovaMovimentacao" placeholder="Digite o novo status ou movimentação"/>
+        </div>
+        
+        <p><b>Histórico:</b></p>
+        <div class="hist-container" id="histContainer">
+            ${processo.historico ? processo.historico.map(mov => `<div class="hist-card">${mov.text}<span>${mov.data}</span></div>`).join("") : '<p style="font-size:12px;color:#888;">Sem histórico.</p>'}
+        </div>
+    `;
 
-    const processos = cliente.processo ? cliente.processo.split(",").map(p => p.trim()) : [];
-    processos.forEach(numero => {
-        const valor = clienteData?.processos?.[numero]?.valorCausa || "";
-        const ultima = clienteData?.processos?.[numero]?.ultimaMovimentacao || "";
-        const historico = clienteData?.processos?.[numero]?.historico || [];
+    // Define o valor selecionado no SELECT de Andamento
+    document.getElementById("inputAndamento").value = processo.andamento?.toLowerCase() || 'andamento';
 
-        const row = document.createElement("div");
-        row.className = "row";
-        row.innerHTML = `
-            <p><b>Nº ${numero}</b></p>
-            <input type="text" placeholder="Valor da causa" data-numero="${numero}" data-field="valorCausa" value="${valor}"/>
-            <input type="text" placeholder="Última movimentação" data-numero="${numero}" data-field="ultimaMovimentacao" value="${ultima}"/>
-            <div class="hist-container" id="hist-${numero}">
-                ${historico.map(mov => `<div class="hist-card">${mov.text}<span>${mov.data}</span></div>`).join("")}
-            </div>
-        `;
-        processosContainer.appendChild(row);
-    });
 
     modalBackdrop.style.display = "flex";
 }
@@ -178,52 +268,68 @@ function agoraFormatado() {
     return d.toLocaleString("pt-BR", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" });
 }
 
+// Lógica de SALVAR
 processosForm.onsubmit = async function(e) {
     e.preventDefault();
-    if (!clienteAtual) return;
+    if (!processoAtual || !clienteAtualId) return;
 
-    const updates = {};
-    const historicoUpdates = {};
+    const numProcesso = document.getElementById("inputNumProcesso").value;
+    const classe = document.getElementById("inputClasse").value;
+    const valorCausa = document.getElementById("inputValorCausa").value;
+    const andamento = document.getElementById("inputAndamento").value;
+    const novaMovimentacao = document.getElementById("inputNovaMovimentacao").value.trim();
 
-    processosContainer.querySelectorAll("input").forEach(input => {
-        const numero = input.dataset.numero;
-        const field = input.dataset.field;
-        const value = input.value.trim();
+    // 1. Prepara o objeto de atualização do processo
+    const processoAtualizado = {
+        numeroProcesso: numProcesso,
+        classe: classe,
+        valorCausa: valorCausa,
+        andamento: andamento,
+        // Mantém o histórico anterior (será substituído pelo array)
+        historico: processoAtual.historico || [] 
+    };
 
-        if (!updates[`processos.${numero}`]) updates[`processos.${numero}`] = {};
-        updates[`processos.${numero}`][field] = value;
-
-        if (field === "ultimaMovimentacao" && value !== "") {
-            if (!historicoUpdates[numero]) historicoUpdates[numero] = [];
-            historicoUpdates[numero].push({ text: value, data: agoraFormatado() });
-        }
-    });
-
-    const docRef = doc(db,"clientes",clienteAtual.id);
-    await updateDoc(docRef, updates);
-
-    for (const numero in historicoUpdates) {
-        for (const mov of historicoUpdates[numero]) {
-            await updateDoc(docRef, { [`processos.${numero}.historico`]: arrayUnion(mov) });
-        }
+    // 2. Adiciona a nova movimentação ao histórico (se houver)
+    if (novaMovimentacao) {
+        const novaMov = { text: novaMovimentacao, data: agoraFormatado() };
+        processoAtualizado.historico.push(novaMov);
     }
-
-    for (const numero in historicoUpdates) {
-        const container = document.getElementById(`hist-${numero}`);
-        historicoUpdates[numero].forEach(mov => {
-            const div = document.createElement("div");
-            div.className = "hist-card";
-            div.innerHTML = `${mov.text}<span>${mov.data}</span>`;
-            container.appendChild(div);
+    
+    // 3. Atualiza o ARRAY COMPLETO de processos no Firestore
+    const processosArrayCopy = todosOsProcessos
+        .filter(p => p.clienteId === clienteAtualId) // Filtra apenas os processos deste cliente
+        .map(p => {
+            // Encontra o processo que estamos editando pelo índice
+            if (p.processoIndex === processoAtual.processoIndex) {
+                // Retorna a nova versão
+                return processoAtualizado; 
+            }
+            return p; // Mantém os outros processos
         });
-    }
 
-    alert("Processos atualizados com histórico e timestamps!");
+    const docRef = doc(db, "clientes", clienteAtualId);
+    
+    // O Firestore exige a atualização de todo o array.
+    try {
+        await updateDoc(docRef, { processos: processosArrayCopy });
+        
+        // 4. Feedback e recarregamento
+        alert("Processo atualizado com sucesso!");
+        modalBackdrop.style.display = "none";
+        
+        // Recarrega todos os dados para refletir as mudanças
+        carregarProcessos(); 
+
+    } catch(error) {
+        console.error("Erro ao salvar o processo:", error);
+        alert("Erro ao salvar o processo. Verifique o console.");
+    }
 };
 
 document.getElementById("btnCancel").onclick = () => { modalBackdrop.style.display = "none"; };
 
-carregarClientes();
+// Inicia o carregamento ao carregar a página
+carregarProcessos();
 </script>
 </head>
 <body>
@@ -240,19 +346,21 @@ carregarClientes();
 
 <div class="main">
 <header>
-    <h1>Processos</h1>
+    <h1>Processos Fechados</h1>
 </header>
 
 <div class="kanban-container">
-    <div class="kanban" id="clientesContainer"></div>
+    <div class="kanban" id="kanbanContainer">
+        </div>
 </div>
 </div>
 
 <div class="modal-backdrop" id="modalBackdrop">
 <div class="modal">
-    <h3 id="modalTitle">Processos</h3>
+    <h3 id="modalTitle">Processo</h3>
     <form id="processosForm">
-        <div id="processosContainer"></div>
+        <div id="processosContainer">
+            </div>
         <div class="actions">
             <button type="submit" class="btn primary">Salvar</button>
             <button type="button" class="btn ghost" id="btnCancel">Cancelar</button>
