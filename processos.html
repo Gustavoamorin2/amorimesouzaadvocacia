@@ -10,23 +10,23 @@
 body { display:flex; background:#f0f2f5; height:100vh; overflow:hidden; transition:filter 0.3s; }
 
 .sidebar {
-  width:80px; background:#1e1e2f; display:flex; flex-direction:column; align-items:center;
-  padding:20px 0; flex-shrink:0; transition:width 0.4s ease; position:relative; z-index:10;
+    width:80px; background:#1e1e2f; display:flex; flex-direction:column; align-items:center;
+    padding:20px 0; flex-shrink:0; transition:width 0.4s ease; position:relative; z-index:10;
 }
 .sidebar.expanded { width:220px; }
 .sidebar h2 {
-  font-size:22px; font-family:'Poppins', sans-serif; font-weight:600; color:#fff;
-  letter-spacing:1px; margin-bottom:30px; text-align:center; cursor:pointer;
-  width:100%; white-space:nowrap; overflow:hidden; transition:opacity 0.3s;
-  opacity:0;
+    font-size:22px; font-family:'Poppins', sans-serif; font-weight:600; color:#fff;
+    letter-spacing:1px; margin-bottom:30px; text-align:center; cursor:pointer;
+    width:100%; white-space:nowrap; overflow:hidden; transition:opacity 0.3s;
+    opacity:0;
 }
 .sidebar.expanded h2 { opacity:1; }
 
 .sidebar button {
-  width:100%; background:transparent; border:none; color:#fff;
-  display:flex; align-items:center; gap:15px; padding:12px 20px; margin:5px 0;
-  cursor:pointer; border-radius:10px; transition:background 0.3s, color 0.3s; font-size:14px;
-  white-space:nowrap; overflow:hidden;
+    width:100%; background:transparent; border:none; color:#fff;
+    display:flex; align-items:center; gap:15px; padding:12px 20px; margin:5px 0;
+    cursor:pointer; border-radius:10px; transition:background 0.3s, color 0.3s; font-size:14px;
+    white-space:nowrap; overflow:hidden;
 }
 .sidebar button img { width:28px; height:28px; filter: invert(1); flex-shrink:0; transition:transform 0.3s; }
 .sidebar button span { display:inline-block; opacity:0; transition:opacity 0.3s; font-weight:500; }
@@ -70,6 +70,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebas
 import { getFirestore, collection, getDocs, doc, updateDoc, getDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-firestore.js";
 
 const firebaseConfig = {
+    // Seus dados de configuração do Firebase
     apiKey: "AIzaSyAFJJAqVf3ge0WDHBpmS9E6sXKvnjuFkhw",
     authDomain: "dapapp-38637.firebaseapp.com",
     projectId: "dapapp-38637",
@@ -103,6 +104,7 @@ searchInput.style.width = "250px";
 header.appendChild(searchInput);
 
 let clienteAtual = null;
+let clienteDataOriginal = null; // Armazena os dados originais do Firestore
 
 async function carregarClientes() {
     clientesContainer.innerHTML = "";
@@ -146,16 +148,21 @@ async function abrirModal(cliente) {
     clienteAtual = cliente;
     const docRef = doc(db,"clientes",cliente.id);
     const docSnap = await getDoc(docRef);
-    const clienteData = docSnap.exists() ? docSnap.data() : {};
-
+    clienteDataOriginal = docSnap.exists() ? docSnap.data() : {}; // Salva os dados originais
+    
     modalTitle.textContent = `Processos de ${cliente.nome}`;
     processosContainer.innerHTML = "";
 
-    const processos = cliente.processo ? cliente.processo.split(",").map(p => p.trim()) : [];
+    const processos = clienteDataOriginal.processos ? Object.keys(clienteDataOriginal.processos) : 
+                     (cliente.processo ? cliente.processo.split(",").map(p => p.trim()) : []);
+    
     processos.forEach(numero => {
-        const valor = clienteData?.processos?.[numero]?.valorCausa || "";
-        const ultima = clienteData?.processos?.[numero]?.ultimaMovimentacao || "";
-        const historico = clienteData?.processos?.[numero]?.historico || [];
+        const processoData = clienteDataOriginal.processos?.[numero] || {};
+        const valor = processoData.valorCausa || "";
+        const ultima = processoData.ultimaMovimentacao || "";
+        
+        // CORREÇÃO DE LEITURA: Garante que "historico" é um array para exibição
+        const historico = processoData.historico || [];
 
         const row = document.createElement("div");
         row.className = "row";
@@ -180,45 +187,65 @@ function agoraFormatado() {
 
 processosForm.onsubmit = async function(e) {
     e.preventDefault();
-    if (!clienteAtual) return;
+    if (!clienteAtual || !clienteDataOriginal) return;
 
     const updates = {};
-    const historicoUpdates = {};
+    const historicoToSave = {};
 
     processosContainer.querySelectorAll("input").forEach(input => {
         const numero = input.dataset.numero;
         const field = input.dataset.field;
         const value = input.value.trim();
+        
+        // Pega o valor original do Firestore para comparação
+        const originalValue = clienteDataOriginal.processos?.[numero]?.[field] || "";
 
-        if (!updates[`processos.${numero}`]) updates[`processos.${numero}`] = {};
-        updates[`processos.${numero}`][field] = value;
-
-        if (field === "ultimaMovimentacao" && value !== "") {
-            if (!historicoUpdates[numero]) historicoUpdates[numero] = [];
-            historicoUpdates[numero].push({ text: value, data: agoraFormatado() });
+        // 1. Prepara a atualização de campo (valorCausa, ultimaMovimentacao)
+        if (value !== originalValue) {
+            updates[`processos.${numero}.${field}`] = value;
+            
+            // 2. Se a ÚLTIMA MOVIMENTAÇÃO mudou, prepara o item de histórico
+            if (field === "ultimaMovimentacao" && value !== "") {
+                if (!historicoToSave[numero]) historicoToSave[numero] = [];
+                // Adiciona a nova movimentação à lista de histórico a ser salva
+                historicoToSave[numero].push({ text: value, data: agoraFormatado() });
+            }
         }
     });
 
     const docRef = doc(db,"clientes",clienteAtual.id);
-    await updateDoc(docRef, updates);
+    const updatePromises = [];
 
-    for (const numero in historicoUpdates) {
-        for (const mov of historicoUpdates[numero]) {
-            await updateDoc(docRef, { [`processos.${numero}.historico`]: arrayUnion(mov) });
-        }
+    // 1. Atualiza os campos simples (valorCausa e ultimaMovimentacao)
+    if (Object.keys(updates).length > 0) {
+        updatePromises.push(updateDoc(docRef, updates));
     }
 
-    for (const numero in historicoUpdates) {
+    // 2. Atualiza os arrays de histórico
+    for (const numero in historicoToSave) {
+        // Usa arrayUnion para adicionar a nova movimentação ao array 'historico'
+        updatePromises.push(updateDoc(docRef, {
+            [`processos.${numero}.historico`]: arrayUnion(...historicoToSave[numero])
+        }));
+
+        // 3. Atualiza o DOM para mostrar a nova movimentação sem precisar recarregar
         const container = document.getElementById(`hist-${numero}`);
-        historicoUpdates[numero].forEach(mov => {
+        historicoToSave[numero].forEach(mov => {
             const div = document.createElement("div");
             div.className = "hist-card";
             div.innerHTML = `${mov.text}<span>${mov.data}</span>`;
-            container.appendChild(div);
+            // Adiciona no TOPO do container (opcional, para ver a mais recente primeiro)
+            container.prepend(div); 
         });
     }
 
-    alert("Processos atualizados com histórico e timestamps!");
+    // Espera todas as atualizações serem concluídas
+    await Promise.all(updatePromises);
+
+    alert("Processos e histórico atualizados com sucesso!");
+    // Atualiza o dado original localmente para não salvar o mesmo histórico novamente se clicar Salvar de novo
+    // Uma abordagem mais segura seria recarregar o modal, mas esta é mais leve:
+    clienteDataOriginal = (await getDoc(docRef)).data(); 
 };
 
 document.getElementById("btnCancel").onclick = () => { modalBackdrop.style.display = "none"; };
