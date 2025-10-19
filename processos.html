@@ -6,6 +6,7 @@
 <title>Processos - CRM AMR ADV</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600&display=swap" rel="stylesheet">
 <style>
+/* --- ESTILOS CSS --- (Mantidos do original) */
 * { margin:0; padding:0; box-sizing:border-box; font-family: 'Segoe UI', sans-serif; }
 body { display:flex; background:#f0f2f5; height:100vh; overflow:hidden; transition:filter 0.3s; }
 
@@ -70,12 +71,12 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebas
 import { getFirestore, collection, getDocs, doc, updateDoc, getDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-firestore.js";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyAFJJAqVf3ge0WDHBpmS9E6sXKvnjuFkhw",
-    authDomain: "dapapp-38637.firebaseapp.com",
-    projectId: "dapapp-38637",
-    storageBucket: "dapapp-38637.appspot.com",
-    messagingSenderId: "628852295313",
-    appId: "1:628852295313:web:1234567890abcdef123456"
+    apiKey: "AIzaSyAFJJAqVf3ge0WDHBpmS9E6sXKvnjuFkhw",
+    authDomain: "dapapp-38637.firebaseapp.com",
+    projectId: "dapapp-38637",
+    storageBucket: "dapapp-38637.appspot.com",
+    messagingSenderId: "628852295313",
+    appId: "1:628852295313:web:1234567890abcdef123456"
 };
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -105,120 +106,164 @@ header.appendChild(searchInput);
 let clienteAtual = null;
 
 async function carregarClientes() {
-    clientesContainer.innerHTML = "";
-    const snapshot = await getDocs(collection(db,"clientes"));
-    snapshot.forEach(docSnap => {
-        const cliente = { id: docSnap.id, ...docSnap.data() };
-        if (cliente.status === "fechado") {
-            const card = document.createElement("div");
-            card.className = "card fechado";
-            card.onclick = () => abrirModal(cliente);
+    clientesContainer.innerHTML = "";
+    try {
+        // Busca todos os clientes
+        const snapshot = await getDocs(collection(db,"clientes"));
+        snapshot.forEach(docSnap => {
+            const cliente = { id: docSnap.id, ...docSnap.data() };
+            
+            // FILTRA SOMENTE CLIENTES COM STATUS 'FECHADO'
+            if (cliente.status === "fechado") {
+                const card = document.createElement("div");
+                card.className = "card fechado";
+                card.onclick = () => abrirModal(cliente);
 
-            const colorBar = document.createElement("div");
-            colorBar.className = "color-bar";
-            card.appendChild(colorBar);
+                const colorBar = document.createElement("div");
+                colorBar.className = "color-bar";
+                card.appendChild(colorBar);
 
-            const content = document.createElement("div");
-            content.className = "card-content";
-            content.innerHTML = `
-                <h3>${cliente.nome}</h3>
-                <p>CPF: ${cliente.cpf||"-"}</p>
-                <p>Classe: ${cliente.classe||"-"}</p>
-                <p>Processo: ${cliente.processo||"-"}</p>
-            `;
-            card.appendChild(content);
+                const content = document.createElement("div");
+                content.className = "card-content";
+                content.innerHTML = `
+                    <h3>${cliente.nome}</h3>
+                    <p>CPF: ${cliente.cpf||"-"}</p>
+                    <p>Classe: ${cliente.classe||"-"}</p>
+                    <p>Processo: ${cliente.processo||"-"}</p>
+                `;
+                card.appendChild(content);
 
-            clientesContainer.appendChild(card);
-        }
-    });
+                clientesContainer.appendChild(card);
+            }
+        });
+    } catch (error) {
+        console.error("Erro ao carregar clientes: ", error);
+        clientesContainer.innerHTML = "<p>Erro ao carregar dados do Firestore.</p>";
+    }
 }
 
 searchInput.addEventListener("input", () => {
-    const termo = searchInput.value.toLowerCase();
-    const cards = clientesContainer.querySelectorAll(".card");
-    cards.forEach(card => {
-        const nome = card.querySelector("h3").textContent.toLowerCase();
-        card.style.display = nome.includes(termo) ? "flex" : "none";
-    });
+    const termo = searchInput.value.toLowerCase();
+    const cards = clientesContainer.querySelectorAll(".card");
+    cards.forEach(card => {
+        const nome = card.querySelector("h3").textContent.toLowerCase();
+        card.style.display = nome.includes(termo) ? "flex" : "none";
+    });
 });
 
 async function abrirModal(cliente) {
-    clienteAtual = cliente;
-    const docRef = doc(db,"clientes",cliente.id);
-    const docSnap = await getDoc(docRef);
-    const clienteData = docSnap.exists() ? docSnap.data() : {};
+    clienteAtual = cliente;
+    const docRef = doc(db,"clientes",cliente.id);
+    const docSnap = await getDoc(docRef);
+    const clienteData = docSnap.exists() ? docSnap.data() : {};
 
-    modalTitle.textContent = `Processos de ${cliente.nome}`;
-    processosContainer.innerHTML = "";
+    modalTitle.textContent = `Processos de ${cliente.nome}`;
+    processosContainer.innerHTML = "";
 
-    const processos = cliente.processo ? cliente.processo.split(",").map(p => p.trim()) : [];
-    processos.forEach(numero => {
-        const valor = clienteData?.processos?.[numero]?.valorCausa || "";
-        const ultima = clienteData?.processos?.[numero]?.ultimaMovimentacao || "";
-        const historico = clienteData?.processos?.[numero]?.historico || [];
+    const processos = cliente.processo ? cliente.processo.split(",").map(p => p.trim()) : [];
+    processos.forEach(numero => {
+        // Acesso aninhado: clienteData.processos.NUMERO_DO_PROCESSO.campo
+        const processoDetalhe = clienteData?.processos?.[numero] || {};
+        const valor = processoDetalhe.valorCausa || "";
+        const classe = processoDetalhe.classe || ""; // Adicionando campo classe
+        const andamento = processoDetalhe.andamento || ""; // Adicionando campo andamento/status
+        const historico = processoDetalhe.historico || [];
 
-        const row = document.createElement("div");
-        row.className = "row";
-        row.innerHTML = `
-            <p><b>Nº ${numero}</b></p>
-            <input type="text" placeholder="Valor da causa" data-numero="${numero}" data-field="valorCausa" value="${valor}"/>
-            <input type="text" placeholder="Última movimentação" data-numero="${numero}" data-field="ultimaMovimentacao" value="${ultima}"/>
-            <div class="hist-container" id="hist-${numero}">
-                ${historico.map(mov => `<div class="hist-card">${mov.text}<span>${mov.data}</span></div>`).join("")}
-            </div>
-        `;
-        processosContainer.appendChild(row);
-    });
+        const row = document.createElement("div");
+        row.className = "row";
+        row.innerHTML = `
+            <p><b>Nº ${numero}</b></p>
+            <input type="text" placeholder="Classe" data-numero="${numero}" data-field="classe" value="${classe}"/>
+            <input type="text" placeholder="Valor da causa" data-numero="${numero}" data-field="valorCausa" value="${valor}"/>
+            <input type="text" placeholder="Andamento/Status" data-numero="${numero}" data-field="andamento" value="${andamento}"/>
+            <p><b>Nova Movimentação (adiciona ao histórico):</b></p>
+            <input type="text" placeholder="Descreva a nova movimentação (ex: Despacho publicado)" data-numero="${numero}" data-field="novaMovimentacao"/>
+            
+            <p><b>Histórico:</b></p>
+            <div class="hist-container" id="hist-${numero}">
+                ${historico.map(mov => `<div class="hist-card">${mov.text}<span>${mov.data}</span></div>`).join("")}
+            </div>
+        `;
+        processosContainer.appendChild(row);
+    });
 
-    modalBackdrop.style.display = "flex";
+    modalBackdrop.style.display = "flex";
 }
 
 function agoraFormatado() {
-    const d = new Date();
-    return d.toLocaleString("pt-BR", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" });
+    const d = new Date();
+    return d.toLocaleString("pt-BR", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" });
 }
 
+// --- LÓGICA DE SALVAMENTO CORRIGIDA ---
 processosForm.onsubmit = async function(e) {
-    e.preventDefault();
-    if (!clienteAtual) return;
+    e.preventDefault();
+    if (!clienteAtual) return;
 
-    const updates = {};
-    const historicoUpdates = {};
+    const simpleUpdates = {}; // Para campos simples (valorCausa, classe, andamento)
+    const historicoUpdates = {}; // Para novas movimentações no histórico
 
-    processosContainer.querySelectorAll("input").forEach(input => {
-        const numero = input.dataset.numero;
-        const field = input.dataset.field;
-        const value = input.value.trim();
+    processosContainer.querySelectorAll("input").forEach(input => {
+        const numero = input.dataset.numero;
+        const field = input.dataset.field;
+        const value = input.value.trim();
 
-        if (!updates[`processos.${numero}`]) updates[`processos.${numero}`] = {};
-        updates[`processos.${numero}`][field] = value;
-
-        if (field === "ultimaMovimentacao" && value !== "") {
-            if (!historicoUpdates[numero]) historicoUpdates[numero] = [];
-            historicoUpdates[numero].push({ text: value, data: agoraFormatado() });
+        if (!simpleUpdates[`processos.${numero}`]) {
+             simpleUpdates[`processos.${numero}`] = {};
         }
-    });
 
-    const docRef = doc(db,"clientes",clienteAtual.id);
-    await updateDoc(docRef, updates);
-
-    for (const numero in historicoUpdates) {
-        for (const mov of historicoUpdates[numero]) {
-            await updateDoc(docRef, { [`processos.${numero}.historico`]: arrayUnion(mov) });
+        if (field === "novaMovimentacao" && value !== "") {
+            // Captura a nova movimentação para o histórico
+            if (!historicoUpdates[numero]) historicoUpdates[numero] = [];
+            historicoUpdates[numero].push({ text: value, data: agoraFormatado() });
+        } else if (field !== "novaMovimentacao") {
+            // Captura os campos simples (valorCausa, classe, andamento)
+            simpleUpdates[`processos.${numero}`][field] = value;
         }
-    }
+    });
 
-    for (const numero in historicoUpdates) {
-        const container = document.getElementById(`hist-${numero}`);
-        historicoUpdates[numero].forEach(mov => {
-            const div = document.createElement("div");
-            div.className = "hist-card";
-            div.innerHTML = `${mov.text}<span>${mov.data}</span>`;
-            container.appendChild(div);
-        });
-    }
+    const docRef = doc(db,"clientes",clienteAtual.id);
+    
+    try {
+        // 1. Atualiza campos simples (valorCausa, classe, andamento)
+        if (Object.keys(simpleUpdates).length > 0) {
+            // O updateDoc no Firestore permite o uso de 'dot notation' (processos.1234.campo)
+            await updateDoc(docRef, Object.assign({}, ...Object.entries(simpleUpdates).map(([key, value]) => {
+                return Object.keys(value).reduce((acc, fieldKey) => {
+                    acc[`${key}.${fieldKey}`] = value[fieldKey];
+                    return acc;
+                }, {});
+            })));
+        }
+        
+        // 2. Adiciona as novas movimentações ao array 'historico' usando arrayUnion
+        let hasNewHistory = false;
+        for (const numero in historicoUpdates) {
+            hasNewHistory = true;
+            for (const mov of historicoUpdates[numero]) {
+                // Usa arrayUnion para adicionar o objeto ao array aninhado
+                await updateDoc(docRef, { [`processos.${numero}.historico`]: arrayUnion(mov) });
+            }
+        }
 
-    alert("Processos atualizados com histórico e timestamps!");
+        // 3. Atualiza a UI para mostrar os novos itens do histórico
+        if (hasNewHistory) {
+            for (const numero in historicoUpdates) {
+                const container = document.getElementById(`hist-${numero}`);
+                historicoUpdates[numero].forEach(mov => {
+                    const div = document.createElement("div");
+                    div.className = "hist-card";
+                    div.innerHTML = `${mov.text}<span>${mov.data}</span>`;
+                    container.appendChild(div);
+                });
+            }
+        }
+        
+        alert("Processos atualizados com sucesso!");
+    } catch (error) {
+        console.error("Erro ao salvar no Firestore: ", error);
+        alert("Erro ao salvar no Firestore. Verifique o console.");
+    }
 };
 
 document.getElementById("btnCancel").onclick = () => { modalBackdrop.style.display = "none"; };
