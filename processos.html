@@ -9,25 +9,12 @@
 * { margin:0; padding:0; box-sizing:border-box; font-family: 'Segoe UI', sans-serif; }
 body { display:flex; background:#f0f2f5; height:100vh; overflow:hidden; transition:filter 0.3s; }
 
-.sidebar {
-  width:80px; background:#1e1e2f; display:flex; flex-direction:column; align-items:center;
-  padding:20px 0; flex-shrink:0; transition:width 0.4s ease; position:relative; z-index:10;
-}
+.sidebar { width:80px; background:#1e1e2f; display:flex; flex-direction:column; align-items:center; padding:20px 0; flex-shrink:0; transition:width 0.4s ease; position:relative; z-index:10; }
 .sidebar.expanded { width:220px; }
-.sidebar h2 {
-  font-size:22px; font-family:'Poppins', sans-serif; font-weight:600; color:#fff;
-  letter-spacing:1px; margin-bottom:30px; text-align:center; cursor:pointer;
-  width:100%; white-space:nowrap; overflow:hidden; transition:opacity 0.3s;
-  opacity:0;
-}
+.sidebar h2 { font-size:22px; font-family:'Poppins', sans-serif; font-weight:600; color:#fff; letter-spacing:1px; margin-bottom:30px; text-align:center; cursor:pointer; width:100%; white-space:nowrap; overflow:hidden; transition:opacity 0.3s; opacity:0; }
 .sidebar.expanded h2 { opacity:1; }
 
-.sidebar button {
-  width:100%; background:transparent; border:none; color:#fff;
-  display:flex; align-items:center; gap:15px; padding:12px 20px; margin:5px 0;
-  cursor:pointer; border-radius:10px; transition:background 0.3s, color 0.3s; font-size:14px;
-  white-space:nowrap; overflow:hidden;
-}
+.sidebar button { width:100%; background:transparent; border:none; color:#fff; display:flex; align-items:center; gap:15px; padding:12px 20px; margin:5px 0; cursor:pointer; border-radius:10px; transition:background 0.3s, color 0.3s; font-size:14px; white-space:nowrap; overflow:hidden; }
 .sidebar button img { width:28px; height:28px; filter: invert(1); flex-shrink:0; transition:transform 0.3s; }
 .sidebar button span { display:inline-block; opacity:0; transition:opacity 0.3s; font-weight:500; }
 .sidebar.expanded button span { opacity:1; }
@@ -56,7 +43,8 @@ header input { padding:6px 10px; border-radius:6px; border:1px solid #ccc; width
 .modal h3 { margin-bottom:12px; }
 .modal .row { margin-bottom:20px; }
 .modal input { width:100%; padding:8px; border-radius:6px; border:1px solid #ccc; margin-top:4px; }
-.hist-container { margin-top:10px; display:flex; flex-direction:column; gap:6px; max-height:150px; overflow-y:auto; }
+/* CSS CRUCIAL: Exibe o mais novo no topo da lista */
+.hist-container { margin-top:10px; display:flex; flex-direction:column-reverse; gap:6px; max-height:150px; overflow-y:auto; } 
 .hist-card { background:#f1f3f5; padding:6px 10px; border-radius:10px; box-shadow:0 2px 4px rgba(0,0,0,0.1); font-size:14px; color:#333; display:flex; justify-content:space-between; }
 .hist-card span { font-size:12px; color:#888; margin-left:8px; }
 .modal .actions { display:flex; gap:8px; justify-content:flex-end; margin-top:10px; }
@@ -69,6 +57,7 @@ header input { padding:6px 10px; border-radius:6px; border:1px solid #ccc; width
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
 import { getFirestore, collection, getDocs, doc, updateDoc, getDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-firestore.js";
 
+// VERIFIQUE AS SUAS CHAVES AQUI
 const firebaseConfig = {
     apiKey: "AIzaSyAFJJAqVf3ge0WDHBpmS9E6sXKvnjuFkhw",
     authDomain: "dapapp-38637.firebaseapp.com",
@@ -89,7 +78,7 @@ const header = document.querySelector("header");
 const mainContent = document.querySelector(".main");
 const sidebar = document.querySelector(".sidebar");
 
-// Sidebar hover + blur
+// UI Interação
 sidebar.addEventListener('mouseenter', () => { sidebar.classList.add('expanded'); mainContent.classList.add('blur'); });
 sidebar.addEventListener('mouseleave', () => { sidebar.classList.remove('expanded'); mainContent.classList.remove('blur'); });
 
@@ -103,6 +92,9 @@ searchInput.style.width = "250px";
 header.appendChild(searchInput);
 
 let clienteAtual = null;
+let processosIniciais = {}; 
+
+// MARK: - FUNÇÕES DE CARREGAMENTO E EXIBIÇÃO
 
 async function carregarClientes() {
     clientesContainer.innerHTML = "";
@@ -142,40 +134,65 @@ searchInput.addEventListener("input", () => {
     });
 });
 
+/**
+ * Função responsável por renderizar o conteúdo dentro da modal.
+ * @param {object} clienteData - Dados completos do cliente (do Firestore).
+ */
+function renderizarProcessosNaModal(clienteData) {
+    processosContainer.innerHTML = "";
+    processosIniciais = {}; // Reseta o estado inicial
+
+    const processos = clienteAtual.processo ? clienteAtual.processo.split(",").map(p => p.trim()) : [];
+    
+    processos.forEach(numero => {
+        const detalhesProcesso = clienteData?.processos?.[numero] || {};
+        const valor = detalhesProcesso.valorCausa || "";
+        const ultima = detalhesProcesso.ultimaMovimentacao || "";
+        const historico = detalhesProcesso.historico || [];
+        
+        // Armazena o estado inicial para comparação no submit
+        processosIniciais[numero] = {
+            valorCausa: valor,
+            ultimaMovimentacao: ultima,
+        };
+
+        const row = document.createElement("div");
+        row.className = "row";
+        
+        // Gera o HTML do histórico (o CSS cuida da ordem)
+        const historicoHTML = historico.map(mov => 
+            `<div class="hist-card">${mov.text}<span>${mov.data}</span></div>`
+        ).join("");
+        
+        row.innerHTML = `
+            <p><b>Nº ${numero}</b></p>
+            <input type="text" placeholder="Valor da causa" data-numero="${numero}" data-field="valorCausa" value="${valor}"/>
+            <input type="text" placeholder="Última movimentação (Nova Movimentação)" data-numero="${numero}" data-field="ultimaMovimentacao" value="${ultima}"/>
+            <div class="hist-container" id="hist-${numero}">
+                ${historicoHTML}
+            </div>
+        `;
+        processosContainer.appendChild(row);
+    });
+}
+
 async function abrirModal(cliente) {
     clienteAtual = cliente;
     const docRef = doc(db,"clientes",cliente.id);
     const docSnap = await getDoc(docRef);
     const clienteData = docSnap.exists() ? docSnap.data() : {};
-
+    
     modalTitle.textContent = `Processos de ${cliente.nome}`;
-    processosContainer.innerHTML = "";
-
-    const processos = cliente.processo ? cliente.processo.split(",").map(p => p.trim()) : [];
-    processos.forEach(numero => {
-        const valor = clienteData?.processos?.[numero]?.valorCausa || "";
-        const ultima = clienteData?.processos?.[numero]?.ultimaMovimentacao || "";
-        const historico = clienteData?.processos?.[numero]?.historico || [];
-
-        const row = document.createElement("div");
-        row.className = "row";
-        row.innerHTML = `
-            <p><b>Nº ${numero}</b></p>
-            <input type="text" placeholder="Valor da causa" data-numero="${numero}" data-field="valorCausa" value="${valor}"/>
-            <input type="text" placeholder="Última movimentação" data-numero="${numero}" data-field="ultimaMovimentacao" value="${ultima}"/>
-            <div class="hist-container" id="hist-${numero}">
-                ${historico.map(mov => `<div class="hist-card">${mov.text}<span>${mov.data}</span></div>`).join("")}
-            </div>
-        `;
-        processosContainer.appendChild(row);
-    });
-
+    renderizarProcessosNaModal(clienteData); // Chama a renderização
     modalBackdrop.style.display = "flex";
 }
 
+// MARK: - FUNÇÕES DE SALVAMENTO
+
 function agoraFormatado() {
     const d = new Date();
-    return d.toLocaleString("pt-BR", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" });
+    const pad = (num) => num.toString().padStart(2, '0');
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 processosForm.onsubmit = async function(e) {
@@ -183,42 +200,62 @@ processosForm.onsubmit = async function(e) {
     if (!clienteAtual) return;
 
     const updates = {};
-    const historicoUpdates = {};
+    const historicoParaAdicionar = {};
+    const docRef = doc(db,"clientes",clienteAtual.id);
+    let houveMudanca = false;
 
+    // 1. Coleta os dados e compara com o estado inicial
     processosContainer.querySelectorAll("input").forEach(input => {
         const numero = input.dataset.numero;
         const field = input.dataset.field;
         const value = input.value.trim();
+        const initialValue = processosIniciais[numero]?.[field] || "";
 
+        // Sempre adiciona ao objeto de updates
         if (!updates[`processos.${numero}`]) updates[`processos.${numero}`] = {};
         updates[`processos.${numero}`][field] = value;
-
-        if (field === "ultimaMovimentacao" && value !== "") {
-            if (!historicoUpdates[numero]) historicoUpdates[numero] = [];
-            historicoUpdates[numero].push({ text: value, data: agoraFormatado() });
+        
+        // Verifica se houve qualquer mudança (para evitar salvar se nada mudou)
+        if (value !== initialValue) {
+             houveMudanca = true;
+        }
+        
+        // Lógica de Histórico: Adiciona ao array se a movimentação mudou e não está vazia.
+        if (field === "ultimaMovimentacao" && value !== "" && value !== initialValue) {
+            if (!historicoParaAdicionar[numero]) {
+                historicoParaAdicionar[numero] = [];
+            }
+            historicoParaAdicionar[numero].push({ text: value, data: agoraFormatado() });
         }
     });
 
-    const docRef = doc(db,"clientes",clienteAtual.id);
-    await updateDoc(docRef, updates);
+    if (!houveMudanca) {
+         alert("Nenhum dado alterado para salvar.");
+         return;
+    }
+    
+    try {
+        // 2. Realiza a primeira atualização (valorCausa e ultimaMovimentacao)
+        await updateDoc(docRef, updates);
 
-    for (const numero in historicoUpdates) {
-        for (const mov of historicoUpdates[numero]) {
-            await updateDoc(docRef, { [`processos.${numero}.historico`]: arrayUnion(mov) });
+        // 3. Realiza a atualização do array 'historico' usando arrayUnion
+        for (const numero in historicoParaAdicionar) {
+            for (const mov of historicoParaAdicionar[numero]) {
+                await updateDoc(docRef, { [`processos.${numero}.historico`]: arrayUnion(mov) });
+            }
         }
-    }
 
-    for (const numero in historicoUpdates) {
-        const container = document.getElementById(`hist-${numero}`);
-        historicoUpdates[numero].forEach(mov => {
-            const div = document.createElement("div");
-            div.className = "hist-card";
-            div.innerHTML = `${mov.text}<span>${mov.data}</span>`;
-            container.appendChild(div);
-        });
-    }
+        alert("Processos e histórico atualizados com sucesso!");
+        
+        // 4. CRUCIAL: RECARREGA OS DADOS E RENDERIZA a modal para exibir o novo estado
+        const docSnap = await getDoc(docRef);
+        const clienteData = docSnap.exists() ? docSnap.data() : {};
+        renderizarProcessosNaModal(clienteData);
 
-    alert("Processos atualizados com histórico e timestamps!");
+    } catch (error) {
+        console.error("Erro ao salvar no Firestore:", error);
+        alert("Erro ao salvar. Verifique o console para mais detalhes.");
+    }
 };
 
 document.getElementById("btnCancel").onclick = () => { modalBackdrop.style.display = "none"; };
