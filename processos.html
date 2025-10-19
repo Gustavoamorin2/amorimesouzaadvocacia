@@ -10,23 +10,23 @@
 body { display:flex; background:#f0f2f5; height:100vh; overflow:hidden; transition:filter 0.3s; }
 
 .sidebar {
-  width:80px; background:#1e1e2f; display:flex; flex-direction:column; align-items:center;
-  padding:20px 0; flex-shrink:0; transition:width 0.4s ease; position:relative; z-index:10;
+    width:80px; background:#1e1e2f; display:flex; flex-direction:column; align-items:center;
+    padding:20px 0; flex-shrink:0; transition:width 0.4s ease; position:relative; z-index:10;
 }
 .sidebar.expanded { width:220px; }
 .sidebar h2 {
-  font-size:22px; font-family:'Poppins', sans-serif; font-weight:600; color:#fff;
-  letter-spacing:1px; margin-bottom:30px; text-align:center; cursor:pointer;
-  width:100%; white-space:nowrap; overflow:hidden; transition:opacity 0.3s;
-  opacity:0;
+    font-size:22px; font-family:'Poppins', sans-serif; font-weight:600; color:#fff;
+    letter-spacing:1px; margin-bottom:30px; text-align:center; cursor:pointer;
+    width:100%; white-space:nowrap; overflow:hidden; transition:opacity 0.3s;
+    opacity:0;
 }
 .sidebar.expanded h2 { opacity:1; }
 
 .sidebar button {
-  width:100%; background:transparent; border:none; color:#fff;
-  display:flex; align-items:center; gap:15px; padding:12px 20px; margin:5px 0;
-  cursor:pointer; border-radius:10px; transition:background 0.3s, color 0.3s; font-size:14px;
-  white-space:nowrap; overflow:hidden;
+    width:100%; background:transparent; border:none; color:#fff;
+    display:flex; align-items:center; gap:15px; padding:12px 20px; margin:5px 0;
+    cursor:pointer; border-radius:10px; transition:background 0.3s, color 0.3s; font-size:14px;
+    white-space:nowrap; overflow:hidden;
 }
 .sidebar button img { width:28px; height:28px; filter: invert(1); flex-shrink:0; transition:transform 0.3s; }
 .sidebar button span { display:inline-block; opacity:0; transition:opacity 0.3s; font-weight:500; }
@@ -39,7 +39,6 @@ body { display:flex; background:#f0f2f5; height:100vh; overflow:hidden; transiti
 
 header { height:60px; background:#fff; border-bottom:1px solid #ddd; display:flex; justify-content:space-between; align-items:center; padding:0 20px; flex-shrink:0; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.05);}
 header h1 { font-size:22px; color:#1e1e2f; font-family:'Poppins', sans-serif; }
-header input { padding:6px 10px; border-radius:6px; border:1px solid #ccc; width:250px; }
 
 .kanban-container { flex:1; overflow-y:auto; padding:20px; }
 .kanban { display:flex; flex-wrap:wrap; gap:20px; }
@@ -56,7 +55,7 @@ header input { padding:6px 10px; border-radius:6px; border:1px solid #ccc; width
 .modal h3 { margin-bottom:12px; }
 .modal .row { margin-bottom:20px; }
 .modal input { width:100%; padding:8px; border-radius:6px; border:1px solid #ccc; margin-top:4px; }
-.hist-container { margin-top:10px; display:flex; flex-direction:column; gap:6px; max-height:150px; overflow-y:auto; }
+.hist-container { margin-top:10px; display:flex; flex-direction:column-reverse; gap:6px; max-height:150px; overflow-y:auto; }
 .hist-card { background:#f1f3f5; padding:6px 10px; border-radius:10px; box-shadow:0 2px 4px rgba(0,0,0,0.1); font-size:14px; color:#333; display:flex; justify-content:space-between; }
 .hist-card span { font-size:12px; color:#888; margin-left:8px; }
 .modal .actions { display:flex; gap:8px; justify-content:flex-end; margin-top:10px; }
@@ -93,6 +92,7 @@ const sidebar = document.querySelector(".sidebar");
 sidebar.addEventListener('mouseenter', () => { sidebar.classList.add('expanded'); mainContent.classList.add('blur'); });
 sidebar.addEventListener('mouseleave', () => { sidebar.classList.remove('expanded'); mainContent.classList.remove('blur'); });
 
+// Criação do input de busca dinamicamente
 const searchInput = document.createElement("input");
 searchInput.id = "searchInput";
 searchInput.placeholder = "Pesquisar clientes...";
@@ -103,13 +103,15 @@ searchInput.style.width = "250px";
 header.appendChild(searchInput);
 
 let clienteAtual = null;
+let processosIniciais = {}; // Armazena o estado inicial para verificar mudanças
 
 async function carregarClientes() {
     clientesContainer.innerHTML = "";
     const snapshot = await getDocs(collection(db,"clientes"));
     snapshot.forEach(docSnap => {
         const cliente = { id: docSnap.id, ...docSnap.data() };
-        if (cliente.status === "fechado") {
+        
+        if (cliente.status === "fechado" && cliente.processo) { 
             const card = document.createElement("div");
             card.className = "card fechado";
             card.onclick = () => abrirModal(cliente);
@@ -147,24 +149,40 @@ async function abrirModal(cliente) {
     const docRef = doc(db,"clientes",cliente.id);
     const docSnap = await getDoc(docRef);
     const clienteData = docSnap.exists() ? docSnap.data() : {};
+    
+    processosIniciais = {}; // Zera o estado inicial
 
     modalTitle.textContent = `Processos de ${cliente.nome}`;
     processosContainer.innerHTML = "";
 
     const processos = cliente.processo ? cliente.processo.split(",").map(p => p.trim()) : [];
+    
     processos.forEach(numero => {
-        const valor = clienteData?.processos?.[numero]?.valorCausa || "";
-        const ultima = clienteData?.processos?.[numero]?.ultimaMovimentacao || "";
-        const historico = clienteData?.processos?.[numero]?.historico || [];
+        const detalhesProcesso = clienteData?.processos?.[numero] || {};
+        const valor = detalhesProcesso.valorCausa || "";
+        const ultima = detalhesProcesso.ultimaMovimentacao || "";
+        const historico = detalhesProcesso.historico || [];
+        
+        // Armazena o estado inicial para comparação
+        processosIniciais[numero] = {
+            valorCausa: valor,
+            ultimaMovimentacao: ultima,
+        };
 
         const row = document.createElement("div");
         row.className = "row";
+        
+        // Mapeamento do histórico (do mais antigo para o mais novo) para que o CSS `column-reverse` funcione
+        const historicoHTML = historico.map(mov => 
+            `<div class="hist-card">${mov.text}<span>${mov.data}</span></div>`
+        ).join("");
+        
         row.innerHTML = `
             <p><b>Nº ${numero}</b></p>
             <input type="text" placeholder="Valor da causa" data-numero="${numero}" data-field="valorCausa" value="${valor}"/>
-            <input type="text" placeholder="Última movimentação" data-numero="${numero}" data-field="ultimaMovimentacao" value="${ultima}"/>
+            <input type="text" placeholder="Última movimentação (Nova Movimentação)" data-numero="${numero}" data-field="ultimaMovimentacao" value="${ultima}"/>
             <div class="hist-container" id="hist-${numero}">
-                ${historico.map(mov => `<div class="hist-card">${mov.text}<span>${mov.data}</span></div>`).join("")}
+                ${historicoHTML}
             </div>
         `;
         processosContainer.appendChild(row);
@@ -175,7 +193,9 @@ async function abrirModal(cliente) {
 
 function agoraFormatado() {
     const d = new Date();
-    return d.toLocaleString("pt-BR", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" });
+    // Garante o formato 'dd/MM/yyyy HH:mm'
+    const pad = (num) => num.toString().padStart(2, '0');
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 processosForm.onsubmit = async function(e) {
@@ -183,42 +203,61 @@ processosForm.onsubmit = async function(e) {
     if (!clienteAtual) return;
 
     const updates = {};
-    const historicoUpdates = {};
+    const historicoParaAdicionar = {};
+    const docRef = doc(db,"clientes",clienteAtual.id);
+    let temAtualizacaoGeral = false;
 
+    // 1. Coleta os dados e compara com o estado inicial
     processosContainer.querySelectorAll("input").forEach(input => {
         const numero = input.dataset.numero;
         const field = input.dataset.field;
         const value = input.value.trim();
+        const initialValue = processosIniciais[numero]?.[field] || "";
 
+        // Sempre adiciona aos updates se for valorCausa ou ultimaMovimentacao (campo de texto)
         if (!updates[`processos.${numero}`]) updates[`processos.${numero}`] = {};
         updates[`processos.${numero}`][field] = value;
-
-        if (field === "ultimaMovimentacao" && value !== "") {
-            if (!historicoUpdates[numero]) historicoUpdates[numero] = [];
-            historicoUpdates[numero].push({ text: value, data: agoraFormatado() });
+        temAtualizacaoGeral = true;
+        
+        // Se o campo for 'ultimaMovimentacao' e o valor for novo/diferente do último lido do Firestore
+        // (Isso garante que só crie um novo item de histórico se o texto realmente mudar)
+        if (field === "ultimaMovimentacao" && value !== "" && value !== initialValue) {
+            if (!historicoParaAdicionar[numero]) {
+                historicoParaAdicionar[numero] = [];
+            }
+            historicoParaAdicionar[numero].push({ text: value, data: agoraFormatado() });
         }
     });
 
-    const docRef = doc(db,"clientes",clienteAtual.id);
+    if (!temAtualizacaoGeral) {
+         alert("Nenhum dado alterado para salvar.");
+         return;
+    }
+    
+    // 2. Realiza a primeira atualização (valorCausa e ultimaMovimentacao)
     await updateDoc(docRef, updates);
 
-    for (const numero in historicoUpdates) {
-        for (const mov of historicoUpdates[numero]) {
+    // 3. Realiza a atualização do array 'historico' usando arrayUnion
+    for (const numero in historicoParaAdicionar) {
+        for (const mov of historicoParaAdicionar[numero]) {
+            // Usa arrayUnion para adicionar o novo item ao array 'historico' daquele processo
             await updateDoc(docRef, { [`processos.${numero}.historico`]: arrayUnion(mov) });
-        }
-    }
-
-    for (const numero in historicoUpdates) {
-        const container = document.getElementById(`hist-${numero}`);
-        historicoUpdates[numero].forEach(mov => {
+            
+            // Atualiza a visualização do modal
+            const container = document.getElementById(`hist-${numero}`);
             const div = document.createElement("div");
             div.className = "hist-card";
             div.innerHTML = `${mov.text}<span>${mov.data}</span>`;
-            container.appendChild(div);
-        });
+            container.prepend(div); // Adiciona no topo
+        }
     }
 
-    alert("Processos atualizados com histórico e timestamps!");
+    alert("Processos e histórico atualizados com sucesso! Recarregue o aplicativo para ver o novo status.");
+    // Fecha o modal após a conclusão
+    modalBackdrop.style.display = "none";
+    
+    // Recarrega os dados para que, ao abrir a modal novamente, a nova movimentação seja o valor inicial.
+    carregarClientes();
 };
 
 document.getElementById("btnCancel").onclick = () => { modalBackdrop.style.display = "none"; };
@@ -241,7 +280,7 @@ carregarClientes();
 <div class="main">
 <header>
     <h1>Processos</h1>
-</header>
+    </header>
 
 <div class="kanban-container">
     <div class="kanban" id="clientesContainer"></div>
