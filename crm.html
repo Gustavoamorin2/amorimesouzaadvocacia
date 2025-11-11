@@ -11,8 +11,22 @@
 body { display:flex; background:#f0f2f5; height:100vh; overflow:hidden; }
 .sidebar { width:80px; background:#1e1e2f; display:flex; flex-direction:column; align-items:center; padding:20px 0; flex-shrink:0; transition:width 0.4s ease; position:relative; z-index:10; }
 .sidebar.expanded { width:220px; }
-.sidebar h2 { font-size:22px; font-family:'Poppins', sans-serif; font-weight:600; color:#fff; letter-spacing:1px; margin-bottom:30px; text-align:center; cursor:pointer; width:100%; white-space:nowrap; overflow:hidden; transition:opacity 0.3s; opacity:0; }
+.sidebar h2 { font-size:22px; font-family:'Poppins', sans-serif; font-weight:600; color:#fff; letter-spacing:1px; margin-bottom:10px; text-align:center; cursor:pointer; width:100%; white-space:nowrap; overflow:hidden; transition:opacity 0.3s; opacity:0; }
 .sidebar.expanded h2 { opacity:1; }
+
+/* ==== Novo elemento para exibir o e-mail ==== */
+.sidebar .user-email {
+    color: #bbb;
+    font-size: 12px;
+    text-align: center;
+    margin-bottom: 20px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    word-break: break-word;
+    padding: 0 10px;
+}
+.sidebar.expanded .user-email { opacity: 1; }
+
 .sidebar button { width:100%; background:transparent; border:none; color:#fff; display:flex; align-items:center; gap:15px; padding:12px 20px; margin:5px 0; cursor:pointer; border-radius:10px; transition:background 0.3s, color 0.3s; font-size:14px; white-space:nowrap; overflow:hidden; }
 .sidebar button img { width:28px; height:28px; filter: invert(1); flex-shrink:0; transition:transform 0.3s; }
 .sidebar button span { display:inline-block; opacity:0; transition:opacity 0.3s; font-weight:500; }
@@ -42,31 +56,12 @@ header button { padding:8px 16px; background:#1e1e2f; color:#fff; border:none; b
     min-height:160px; 
     flex-direction:row; 
     position:relative; 
-    /* Garante que o card se ajuste bem e não seja espremido */
     min-width: 100%; 
 }
 .card:hover { transform:scale(1.03); }
 .card .color-bar { width:8px; height:100%; border-radius:15px 0 0 15px; }
-.card-content { 
-    padding:20px; 
-    flex:1; 
-    display:flex; 
-    flex-direction:column; 
-    justify-content:center; 
-    /* GARANTIA DE ESPAÇO PARA O TEXTO */
-    min-width: 0; 
-    overflow: hidden;
-}
-.card h3 { 
-    font-size:20px; 
-    margin-bottom:6px; 
-    color:#333; 
-    /* PERMITE QUEBRA DE LINHA para exibir o nome completo */
-    white-space: normal; 
-    word-break: break-word; 
-    /* Garante que o h3 não tenha limite de altura */
-    line-height: 1.2;
-}
+.card-content { padding:20px; flex:1; display:flex; flex-direction:column; justify-content:center; min-width: 0; overflow: hidden;}
+.card h3 { font-size:20px; margin-bottom:6px; color:#333; white-space: normal; word-break: break-word; line-height: 1.2;}
 .card p { font-size:14px; color:#555; margin:3px 0; }
 .lista-fria .color-bar { background:#3498db; }
 .negociacao .color-bar { background:#f1c40f; }
@@ -82,15 +77,15 @@ header button { padding:8px 16px; background:#1e1e2f; color:#fff; border:none; b
 .modal .row { margin-bottom:10px; }
 .modal input, .modal textarea, .modal select { width:100%; padding:8px; border-radius:6px; border:1px solid #ccc; }
 .modal textarea { min-height:80px; resize:vertical; }
-.modal .actions { display:flex; gap:8px; justify-content:space-between; margin-top:10px; } /* Alterado para justificar entre */
+.modal .actions { display:flex; gap:8px; justify-content:space-between; margin-top:10px; }
 .btn { padding:8px 12px; border-radius:6px; border:0; cursor:pointer; }
 .btn.primary { background:#1e1e2f; color:#fff; }
 .btn.ghost { background:#f1f3f5; }
-.btn.danger { background:#e74c3c; color:#fff; } /* Estilo para o botão de Excluir */
+.btn.danger { background:#e74c3c; color:#fff; }
 .processo-row { display:flex; gap:5px; margin-bottom:5px; }
 .processo-row input { flex:1; }
 .toast { position:fixed; right:20px; bottom:20px; background:#222; color:#fff; padding:8px 12px; border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,.3); display:none; z-index:60; }
-.form-actions-right { display:flex; gap:8px; } /* Para agrupar Salvar e Cancelar */
+.form-actions-right { display:flex; gap:8px; }
 </style>
 
 <script type="module">
@@ -99,12 +94,12 @@ import { getFirestore, collection, addDoc, getDocs, doc, setDoc, updateDoc, quer
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyAFJJAqVf3ge0WDHBpmS9E6sXKvnjuFkhw",
-    authDomain: "dapapp-38637.firebaseapp.com",
-    projectId: "dapapp-38637",
-    storageBucket: "dapapp-38637.appspot.com",
-    messagingSenderId: "628852295313",
-    appId: "1:628852295313:web:1234567890abcdef123456"
+    apiKey: "AIzaSyAFJJAqVf3ge0WDHBpmS9E6sXKvnjuFkhw",
+    authDomain: "dapapp-38637.firebaseapp.com",
+    projectId: "dapapp-38637",
+    storageBucket: "dapapp-38637.appspot.com",
+    messagingSenderId: "628852295313",
+    appId: "1:628852295313:web:1234567890abcdef123456"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -114,285 +109,266 @@ const auth = getAuth(app);
 window.firebaseDB = db;
 
 document.addEventListener('DOMContentLoaded', () => {
-    const sidebar = document.querySelector(".sidebar");
-    const mainContent = document.querySelector(".main");
-    if (sidebar && mainContent) {
-        sidebar.addEventListener('mouseenter', () => { sidebar.classList.add('expanded'); mainContent.classList.add('blur'); });
-        sidebar.addEventListener('mouseleave', () => { sidebar.classList.remove('expanded'); mainContent.classList.remove('blur'); });
-    }
+    const sidebar = document.querySelector(".sidebar");
+    const mainContent = document.querySelector(".main");
 
-    const STATUS=['lista-fria','negociacao','contrato-assinado','fechado'];
-    const cardsMap={};
-    const modalBackdrop=document.getElementById('modalBackdrop');
-    const clientForm=document.getElementById('clientForm');
-    const inputNome=document.getElementById('inputNome');
-    const inputCPF=document.getElementById('inputCPF');
-    const inputObs=document.getElementById('inputObs');
-    const inputStatus=document.getElementById('inputStatus');
-    const inputNumeros=document.getElementById('inputNumeros');
-    const inputClasse=document.getElementById('inputClasse');
-    const inputValor=document.getElementById('inputValor');
-    const inputAndamento=document.getElementById('inputAndamento'); // Novo campo de andamento
-    const btnAdd=document.getElementById('btnAdd');
-    const btnCancel=document.getElementById('btnCancel');
-    const btnDelete=document.getElementById('btnDelete'); // Novo botão de excluir
-    const searchInput=document.getElementById('searchInput');
-    const filterStatus=document.getElementById('filterStatus');
-    const toastEl=document.getElementById('toast');
-    const coinSound=document.getElementById('coinSound');
-    const processosContainer=document.getElementById('processosContainer');
+    // === Adição: referência ao campo de e-mail ===
+    const emailDisplay = document.createElement("div");
+    emailDisplay.className = "user-email";
+    emailDisplay.textContent = "Carregando...";
+    sidebar.insertBefore(emailDisplay, sidebar.children[1]);
 
-    let currentUser=null;
+    if (sidebar && mainContent) {
+        sidebar.addEventListener('mouseenter', () => { sidebar.classList.add('expanded'); mainContent.classList.add('blur'); });
+        sidebar.addEventListener('mouseleave', () => { sidebar.classList.remove('expanded'); mainContent.classList.remove('blur'); });
+    }
 
-    function showToast(msg){ toastEl.innerText=msg; toastEl.style.display='block'; clearTimeout(toastEl._t); toastEl._t=setTimeout(()=>toastEl.style.display='none',3000); }
+    const STATUS=['lista-fria','negociacao','contrato-assinado','fechado'];
+    const cardsMap={};
+    const modalBackdrop=document.getElementById('modalBackdrop');
+    const clientForm=document.getElementById('clientForm');
+    const inputNome=document.getElementById('inputNome');
+    const inputCPF=document.getElementById('inputCPF');
+    const inputObs=document.getElementById('inputObs');
+    const inputStatus=document.getElementById('inputStatus');
+    const inputNumeros=document.getElementById('inputNumeros');
+    const inputClasse=document.getElementById('inputClasse');
+    const inputValor=document.getElementById('inputValor');
+    const inputAndamento=document.getElementById('inputAndamento');
+    const btnAdd=document.getElementById('btnAdd');
+    const btnCancel=document.getElementById('btnCancel');
+    const btnDelete=document.getElementById('btnDelete');
+    const searchInput=document.getElementById('searchInput');
+    const filterStatus=document.getElementById('filterStatus');
+    const toastEl=document.getElementById('toast');
+    const coinSound=document.getElementById('coinSound');
+    const processosContainer=document.getElementById('processosContainer');
+    let currentUser=null;
 
-    async function getClientes(){
-        if(!currentUser) return [];
-        const q = query(collection(db,"clientes"), where("userId","==",currentUser.uid));
-        const snapshot = await getDocs(q);
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    }
+    function showToast(msg){ toastEl.innerText=msg; toastEl.style.display='block'; clearTimeout(toastEl._t); toastEl._t=setTimeout(()=>toastEl.style.display='none',3000); }
 
-    async function saveCliente(cliente){
-        if(!currentUser) return;
-        cliente.userId = currentUser.uid; // garante que pertence ao usuário logado
-        if(cliente.id){
-            const docRef = doc(db, "clientes", cliente.id);
-            await setDoc(docRef, cliente, { merge: true }); // Usar merge para garantir que não sobrescreva campos que não estão no formulário
-        } else {
-            const docRef = await addDoc(collection(db,"clientes"), cliente);
-            cliente.id = docRef.id;
-        }
-    }
+    async function getClientes(){
+        if(!currentUser) return [];
+        const q = query(collection(db,"clientes"), where("userId","==",currentUser.uid));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    }
 
-    async function deleteCliente(id){
-        if(!currentUser || !id) return;
-        if(confirm("Tem certeza que deseja excluir este cliente? Esta ação é irreversível.")){
-            try{
-                await deleteDoc(doc(db,"clientes",id));
-                showToast("Cliente excluído!");
-                closeModal();
-                render();
-            } catch(e){
-                console.error("Erro ao excluir cliente: ", e);
-                showToast("Erro ao excluir cliente.");
-            }
-        }
-    }
+    async function saveCliente(cliente){
+        if(!currentUser) return;
+        cliente.userId = currentUser.uid;
+        if(cliente.id){
+            const docRef = doc(db, "clientes", cliente.id);
+            await setDoc(docRef, cliente, { merge: true });
+        } else {
+            const docRef = await addDoc(collection(db,"clientes"), cliente);
+            cliente.id = docRef.id;
+        }
+    }
 
-    function openModal(edit=false,data=null){
-        modalBackdrop.style.display='flex';
-        document.getElementById('modalTitle').innerText=edit?"Editar Cliente":"Novo Cliente";
-        processosContainer.innerHTML='';
+    async function deleteCliente(id){
+        if(!currentUser || !id) return;
+        if(confirm("Tem certeza que deseja excluir este cliente? Esta ação é irreversível.")){
+            try{
+                await deleteDoc(doc(db,"clientes",id));
+                showToast("Cliente excluído!");
+                closeModal();
+                render();
+            } catch(e){
+                console.error("Erro ao excluir cliente: ", e);
+                showToast("Erro ao excluir cliente.");
+            }
+        }
+    }
 
-        if(edit && data){
-            inputNome.value=data.nome;
-            inputCPF.value=data.cpf||"";
-            inputObs.value=data.obs||"";
-            inputStatus.value=data.status||"lista-fria";
-            inputNumeros.value=data.numeros||"";
-            inputClasse.value=data.classe||"Outros";
-            inputValor.value=data.valor||"";
-            inputAndamento.value=data.andamento||""; // Popula novo campo
-            const processos = data.processo ? data.processo.split(',').map(p=>p.trim()) : [''];
-            processos.forEach(p=>addProcessoField(p));
-            clientForm.dataset.editId=data.id;
-            btnDelete.style.display='inline-block'; // Mostra botão de excluir na edição
-            btnDelete.onclick=()=>deleteCliente(data.id);
-        } else {
-            addProcessoField();
-            inputNome.value=""; inputCPF.value=""; inputObs.value=""; inputStatus.value="lista-fria";
-            inputNumeros.value=""; inputClasse.value="Outros"; inputValor.value="";
-            inputAndamento.value=""; // Limpa novo campo
-            delete clientForm.dataset.editId;
-            btnDelete.style.display='none'; // Esconde botão de excluir em novo cliente
-            btnDelete.onclick=null;
-        }
-    }
+    function openModal(edit=false,data=null){
+        modalBackdrop.style.display='flex';
+        document.getElementById('modalTitle').innerText=edit?"Editar Cliente":"Novo Cliente";
+        processosContainer.innerHTML='';
+        if(edit && data){
+            inputNome.value=data.nome;
+            inputCPF.value=data.cpf||"";
+            inputObs.value=data.obs||"";
+            inputStatus.value=data.status||"lista-fria";
+            inputNumeros.value=data.numeros||"";
+            inputClasse.value=data.classe||"Outros";
+            inputValor.value=data.valor||"";
+            inputAndamento.value=data.andamento||"";
+            const processos = data.processo ? data.processo.split(',').map(p=>p.trim()) : [''];
+            processos.forEach(p=>addProcessoField(p));
+            clientForm.dataset.editId=data.id;
+            btnDelete.style.display='inline-block';
+            btnDelete.onclick=()=>deleteCliente(data.id);
+        } else {
+            addProcessoField();
+            inputNome.value=""; inputCPF.value=""; inputObs.value=""; inputStatus.value="lista-fria";
+            inputNumeros.value=""; inputClasse.value="Outros"; inputValor.value="";
+            inputAndamento.value="";
+            delete clientForm.dataset.editId;
+            btnDelete.style.display='none';
+            btnDelete.onclick=null;
+        }
+    }
 
-    function closeModal(){ modalBackdrop.style.display='none'; }
+    function closeModal(){ modalBackdrop.style.display='none'; }
 
-    function addProcessoField(value=""){
-        const row = document.createElement('div');
-        row.className='processo-row';
-        const input = document.createElement('input');
-        input.className='inputProcesso';
-        input.placeholder='0000000-00.0000.0.00.0000';
-        input.value = value;
-        const btnAdd = document.createElement('button');
-        btnAdd.type='button';
-        btnAdd.className='btn ghost btnAddProcesso';
-        btnAdd.textContent='+';
-        btnAdd.onclick=()=>addProcessoField();
-        const btnRemove = document.createElement('button');
-        btnRemove.type='button';
-        btnRemove.className='btn ghost btnRemoveProcesso';
-        btnRemove.textContent='-';
-        btnRemove.onclick=()=>row.remove();
-        row.appendChild(input);
-        row.appendChild(btnAdd);
-        row.appendChild(btnRemove);
-        processosContainer.appendChild(row);
-    }
+    function addProcessoField(value=""){
+        const row=document.createElement('div');
+        row.className='processo-row';
+        const input=document.createElement('input');
+        input.className='inputProcesso';
+        input.placeholder='0000000-00.0000.0.00.0000';
+        input.value=value;
+        const btnAdd=document.createElement('button');
+        btnAdd.type='button';
+        btnAdd.className='btn ghost btnAddProcesso';
+        btnAdd.textContent='+';
+        btnAdd.onclick=()=>addProcessoField();
+        const btnRemove=document.createElement('button');
+        btnRemove.type='button';
+        btnRemove.className='btn ghost btnRemoveProcesso';
+        btnRemove.textContent='-';
+        btnRemove.onclick=()=>row.remove();
+        row.appendChild(input);
+        row.appendChild(btnAdd);
+        row.appendChild(btnRemove);
+        processosContainer.appendChild(row);
+    }
 
-    function criarCard(cliente){
-        const status = cliente.status || 'lista-fria';
-        const col=document.getElementById(status);
-        if(!col) return;
-        
-        // Remove o card antigo se existir para evitar duplicidade ao atualizar
-        const existingCard = cardsMap[cliente.id];
-        if (existingCard) {
-            existingCard.remove();
-            delete cardsMap[cliente.id];
-        }
+    function criarCard(cliente){
+        const status=cliente.status||'lista-fria';
+        const col=document.getElementById(status);
+        if(!col)return;
+        const existingCard=cardsMap[cliente.id];
+        if(existingCard){existingCard.remove();delete cardsMap[cliente.id];}
+        const card=document.createElement('div');
+        card.className=`card ${status}`;
+        card.dataset.id=cliente.id;
+        card.dataset.status=status;
+        card.dataset.nome=cliente.nome.toLowerCase();
+        card.draggable=true;
+        const colorBar=document.createElement('div');colorBar.className='color-bar';card.appendChild(colorBar);
+        const actionsDiv=document.createElement('div');actionsDiv.className='card-actions';
+        const btnCall=document.createElement('button');
+        btnCall.onclick=(e)=>{e.stopPropagation();ligar(cliente.numeros||'');};
+        btnCall.innerHTML='<img src="https://img.icons8.com/ios-glyphs/30/000000/phone.png"/>';
+        const btnWa=document.createElement('button');
+        btnWa.onclick=(e)=>{e.stopPropagation();whatsapp(cliente.numeros||'');};
+        btnWa.innerHTML='<img src="https://img.icons8.com/ios-glyphs/30/000000/whatsapp.png"/>';
+        actionsDiv.appendChild(btnCall);actionsDiv.appendChild(btnWa);card.appendChild(actionsDiv);
+        const contentDiv=document.createElement('div');contentDiv.className='card-content';
+        const processosArray=cliente.processo?cliente.processo.split(',').map(p=>p.trim()):[];
+        const primeiroProcesso=processosArray.length>0?processosArray[0]:'-';
+        contentDiv.innerHTML=`<h3>${cliente.nome}</h3>
+            <p>CPF: ${cliente.cpf||'-'}</p>
+            <p>Classe: ${cliente.classe||'-'}</p>
+            <p>Processo: ${primeiroProcesso}</p>
+            <p>Valor: R$ ${cliente.valor||'0,00'}</p>
+            <p>Andamento: ${cliente.andamento||'-'}</p>`;
+        card.appendChild(contentDiv);
+        card.onclick=()=>openModal(true,cliente);
+        addDragEvents(card);
+        col.appendChild(card);
+        cardsMap[cliente.id]=card;
+    }
 
-        const card=document.createElement('div');
-        card.className=`card ${status}`;
-        card.dataset.id=cliente.id;
-        card.dataset.status=status;
-        card.dataset.nome=cliente.nome.toLowerCase();
-        card.draggable=true;
+    function ligar(numero){if(!numero){showToast("Número não informado");return;}window.open(`tel:${numero.replace(/\D/g,'')}`);}
+    function whatsapp(numero){if(!numero){showToast("Número não informado");return;}const num=numero.replace(/\D/g,'');window.open(`https://wa.me/55${num}`,'_blank');}
 
-        const colorBar=document.createElement('div'); colorBar.className='color-bar'; card.appendChild(colorBar);
+    async function render(){
+        STATUS.forEach(s=>{const col=document.getElementById(s);const cards=col.querySelectorAll('.card');cards.forEach(card=>card.remove());});
+        for(const k in cardsMap)delete cardsMap[k];
+        const clientes=await getClientes();
+        for(const c of clientes)criarCard(c);
+        filtragemAplicada();
+    }
 
-        const actionsDiv=document.createElement('div'); actionsDiv.className='card-actions';
-        const btnCall=document.createElement('button');
-        btnCall.onclick=(e)=>{ e.stopPropagation(); ligar(cliente.numeros||''); };
-        btnCall.innerHTML='<img src="https://img.icons8.com/ios-glyphs/30/000000/phone.png"/>';
-        const btnWa=document.createElement('button');
-        btnWa.onclick=(e)=>{ e.stopPropagation(); whatsapp(cliente.numeros||''); };
-        btnWa.innerHTML='<img src="https://img.icons8.com/ios-glyphs/30/000000/whatsapp.png"/>';
-        actionsDiv.appendChild(btnCall); actionsDiv.appendChild(btnWa); card.appendChild(actionsDiv);
+    clientForm.onsubmit=async function(e){
+        e.preventDefault();
+        const nome=inputNome.value.trim();
+        if(!nome){showToast("Nome obrigatório");return;}
+        const processos=Array.from(document.querySelectorAll('.inputProcesso')).map(i=>i.value.trim()).filter(v=>v);
+        const novo={
+            nome,cpf:inputCPF.value.trim(),
+            obs:inputObs.value.trim().substring(0,300),
+            status:inputStatus.value,
+            numeros:inputNumeros.value,
+            processo:processos.join(', '),
+            classe:inputClasse.value,
+            valor:inputValor.value,
+            andamento:inputAndamento.value.trim()
+        };
+        if(clientForm.dataset.editId){
+            novo.id=clientForm.dataset.editId;
+            await saveCliente(novo);
+            showToast("Cliente atualizado!");
+        }else{
+            await saveCliente(novo);
+            showToast("Cliente adicionado!");
+        }
+        closeModal();
+        render();
+    };
 
-        const contentDiv=document.createElement('div'); contentDiv.className='card-content';
-        const processosArray = cliente.processo ? cliente.processo.split(',').map(p=>p.trim()) : [];
-        const primeiroProcesso = processosArray.length > 0 ? processosArray[0] : '-';
-        
-        // CORREÇÃO PRINCIPAL: Adicionado de volta o nome do cliente (h3)
-        contentDiv.innerHTML=`
-            <h3>${cliente.nome}</h3> 
-            <p>CPF: ${cliente.cpf||'-'}</p>
-            <p>Classe: ${cliente.classe||'-'}</p>
-            <p>Processo: ${primeiroProcesso}</p>
-            <p>Valor: R$ ${cliente.valor||'0,00'}</p>
-            <p>Andamento: ${cliente.andamento || '-'}</p>`; 
-        card.appendChild(contentDiv);
+    btnAdd.onclick=()=>openModal();
+    btnCancel.onclick=()=>closeModal();
 
-        card.onclick=()=>openModal(true,cliente);
-        addDragEvents(card);
-        col.appendChild(card);
-        cardsMap[cliente.id]=card;
-    }
+    let draggedCard=null;
+    function addDragEvents(card){
+        card.addEventListener('dragstart',()=>{draggedCard=card;card.style.opacity='.5';});
+        card.addEventListener('dragend',()=>{draggedCard=null;card.style.opacity='1';});
+    }
+    document.querySelectorAll('.column').forEach(col=>{
+        col.addEventListener('dragover',e=>e.preventDefault());
+        col.addEventListener('drop',async()=>{
+            if(!draggedCard)return;
+            const id=draggedCard.dataset.id;
+            const status=col.id;
+            const docRef=doc(db,"clientes",id);
+            await updateDoc(docRef,{status});
+            if(status==="fechado"){coinSound.currentTime=0;coinSound.play();}
+            render();
+            showToast("Status atualizado");
+        });
+    });
 
-    function ligar(numero){ if(!numero){ showToast("Número não informado"); return; } window.open(`tel:${numero.replace(/\D/g,'')}`); }
-    function whatsapp(numero){ if(!numero){ showToast("Número não informado"); return; } const num=numero.replace(/\D/g,''); window.open(`https://wa.me/55${num}`,'_blank'); }
+    function filtragemAplicada(){
+        const q=searchInput.value.toLowerCase();
+        const filterS=filterStatus.value;
+        Object.values(cardsMap).forEach(card=>{
+            const matchSearch=card.dataset.nome.includes(q);
+            const matchStatus=!filterS||card.dataset.status===filterS;
+            card.style.display=(matchSearch&&matchStatus)?'flex':'none';
+        });
+    }
+    searchInput.oninput=filtragemAplicada;
+    filterStatus.onchange=filtragemAplicada;
 
-    async function render(){
-        STATUS.forEach(s=>{
-            const col=document.getElementById(s);
-            // Mantém o título H2 e limpa o restante
-            const cards = col.querySelectorAll('.card');
-            cards.forEach(card => card.remove());
-        });
-        for(const k in cardsMap) delete cardsMap[k];
-        const clientes = await getClientes();
-        for(const c of clientes) criarCard(c);
-        filtragemAplicada();
-    }
-
-    clientForm.onsubmit = async function(e){
-        e.preventDefault();
-        const nome = inputNome.value.trim();
-        if(!nome){ showToast("Nome obrigatório"); return; }
-
-        const processos = Array.from(document.querySelectorAll('.inputProcesso'))
-                        .map(i=>i.value.trim())
-                        .filter(v=>v);
-
-        const novo = {
-            nome, cpf: inputCPF.value.trim(),
-            obs: inputObs.value.trim().substring(0,300),
-            status: inputStatus.value,
-            numeros: inputNumeros.value,
-            processo: processos.join(', '),
-            classe: inputClasse.value,
-            valor: inputValor.value, // Valor agora é salvo como string (aceita qualquer formato)
-            andamento: inputAndamento.value.trim() // Salva o novo campo
-        };
-
-        if(clientForm.dataset.editId){
-            novo.id = clientForm.dataset.editId;
-            await saveCliente(novo);
-            showToast("Cliente atualizado!");
-        } else {
-            await saveCliente(novo);
-            showToast("Cliente adicionado!");
-        }
-
-        closeModal();
-        render();
-    };
-
-    btnAdd.onclick=()=>openModal();
-    btnCancel.onclick=()=>closeModal();
-
-    let draggedCard=null;
-    function addDragEvents(card){
-        card.addEventListener('dragstart',()=>{ draggedCard=card; card.style.opacity='.5'; });
-        card.addEventListener('dragend',()=>{ draggedCard=null; card.style.opacity='1'; });
-    }
-    document.querySelectorAll('.column').forEach(col=>{
-        col.addEventListener('dragover', e=>e.preventDefault());
-        col.addEventListener('drop', async ()=>{
-            if(!draggedCard) return;
-            const id = draggedCard.dataset.id;
-            const status = col.id;
-            const docRef = doc(db,"clientes",id);
-            await updateDoc(docRef,{status});
-            if(status === "fechado"){ 
-                coinSound.currentTime = 0;
-                coinSound.play();
-            }
-            render(); 
-            showToast("Status atualizado");
-        });
-    });
-
-    function filtragemAplicada(){
-        const q = searchInput.value.toLowerCase();
-        const filterS = filterStatus.value;
-        Object.values(cardsMap).forEach(card=>{
-            const matchSearch = card.dataset.nome.includes(q);
-            const matchStatus = !filterS || card.dataset.status===filterS;
-            card.style.display=(matchSearch && matchStatus)?'flex':'none';
-        });
-    }
-    searchInput.oninput=filtragemAplicada;
-    filterStatus.onchange=filtragemAplicada;
-
-    // ======= Controle de login =======
-    onAuthStateChanged(auth, user=>{
-        if(user){
-            currentUser = user;
-            render();
-        } else {
-            window.location.href = "login.html"; // redireciona se não estiver logado
-        }
-    });
+    // ======= Controle de login =======
+    onAuthStateChanged(auth, user=>{
+        if(user){
+            currentUser=user;
+            // Atualiza o e-mail na sidebar
+            emailDisplay.textContent = user.email || "Usuário sem e-mail";
+            render();
+        } else {
+            window.location.href = "login.html";
+        }
+    });
 });
 </script>
 </head>
 <body>
 <div class="sidebar">
-    <h2 onclick="window.location.href='dashboard.html'">AMR ADV</h2>
-    <button onclick="window.location.href='crm.html'"><img src="https://img.icons8.com/ios-filled/50/ffffff/dashboard.png"/><span>CRM</span></button>
-    <button onclick="window.location.href='relatorios.html'"><img src="https://img.icons8.com/ios-filled/50/ffffff/combo-chart.png"/><span>Relatórios</span></button>
-    <button onclick="window.location.href='agenda.html'"><img src="https://img.icons8.com/ios-filled/50/ffffff/calendar.png"/><span>Agenda</span></button>
-    <button onclick="window.location.href='discador.html'"><img src="https://img.icons8.com/ios-filled/50/ffffff/contacts.png"/><span>Contatos</span></button>
-    <button onclick="window.location.href='clientes.html'"><img src="https://img.icons8.com/ios-filled/50/ffffff/user-group-man-man.png"/><span>Clientes</span></button>
-    <button onclick="window.location.href='processos.html'"><img src="https://img.icons8.com/ios-filled/50/ffffff/file.png"/><span>Processos</span></button>
-    <button><img src="https://img.icons8.com/ios-filled/50/ffffff/settings.png"/><span>Configurações</span></button>
+    <h2 onclick="window.location.href='dashboard.html'">AMR ADV</h2>
+    <!-- O e-mail será injetado dinamicamente aqui -->
+    <button onclick="window.location.href='crm.html'"><img src="https://img.icons8.com/ios-filled/50/ffffff/dashboard.png"/><span>CRM</span></button>
+    <button onclick="window.location.href='relatorios.html'"><img src="https://img.icons8.com/ios-filled/50/ffffff/combo-chart.png"/><span>Relatórios</span></button>
+    <button onclick="window.location.href='agenda.html'"><img src="https://img.icons8.com/ios-filled/50/ffffff/calendar.png"/><span>Agenda</span></button>
+    <button onclick="window.location.href='discador.html'"><img src="https://img.icons8.com/ios-filled/50/ffffff/contacts.png"/><span>Contatos</span></button>
+    <button onclick="window.location.href='clientes.html'"><img src="https://img.icons8.com/ios-filled/50/ffffff/user-group-man-man.png"/><span>Clientes</span></button>
+    <button onclick="window.location.href='processos.html'"><img src="https://img.icons8.com/ios-filled/50/ffffff/file.png"/><span>Processos</span></button>
+    <button><img src="https://img.icons8.com/ios-filled/50/ffffff/settings.png"/><span>Configurações</span></button>
 </div>
 
 <div class="main">
@@ -430,21 +406,19 @@ document.addEventListener('DOMContentLoaded', () => {
 <div class="row"><input id="inputCPF" placeholder="CPF/CNPJ" /></div>
 <div class="row"><input id="inputNumeros" placeholder="Telefone/WhatsApp" /></div>
 <div class="row"><select id="inputClasse"><option value="Outros">Outros</option><option value="Busca e Apreensão">Busca e Apreensão</option><option value="Execução">Execução</option><option value="Renegociação">Renegociação</option></select></div>
-
 <div class="row"><input id="inputValor" type="text" placeholder="Valor da Causa (R$)" /></div>
-
 <div class="row">
-    <textarea id="inputAndamento" placeholder="Andamento Processual do Cliente" rows="3"></textarea>
+    <textarea id="inputAndamento" placeholder="Andamento Processual do Cliente" rows="3"></textarea>
 </div>
 <div id="processosContainer"></div>
 <div class="row"><textarea id="inputObs" maxlength="300" placeholder="Observações (máx. 300 caracteres)"></textarea></div>
 <div class="row"><select id="inputStatus"><option value="lista-fria">Lista Fria</option><option value="negociacao">Negociação</option><option value="contrato-assinado">Contrato Assinado</option><option value="fechado">Fechado</option></select></div>
 <div class="actions">
-    <button type="button" class="btn danger" id="btnDelete" style="display:none;">Excluir Cliente</button>
-    <div class="form-actions-right">
-        <button type="submit" class="btn primary">Salvar</button>
-        <button type="button" class="btn ghost" id="btnCancel">Cancelar</button>
-    </div>
+    <button type="button" class="btn danger" id="btnDelete" style="display:none;">Excluir Cliente</button>
+    <div class="form-actions-right">
+        <button type="submit" class="btn primary">Salvar</button>
+        <button type="button" class="btn ghost" id="btnCancel">Cancelar</button>
+    </div>
 </div>
 </form>
 </div>
