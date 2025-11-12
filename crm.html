@@ -91,12 +91,21 @@ header button { padding:8px 16px; background:#1e1e2f; color:#fff; border:none; b
 .processo-row input { flex:1; }
 .toast { position:fixed; right:20px; bottom:20px; background:#222; color:#fff; padding:8px 12px; border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,.3); display:none; z-index:60; }
 .form-actions-right { display:flex; gap:8px; } /* Para agrupar Salvar e Cancelar */
+/* Estilos adicionais para o modal de documentos */
+#documentModal .modal { max-width: 500px; }
+#documentList { max-height: 200px; overflow-y: auto; padding: 5px; border: 1px solid #eee; border-radius: 6px; margin-top: 10px; }
+.document-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px dotted #ccc; }
+.document-item:last-child { border-bottom: none; }
+.document-item a { color: #3498db; text-decoration: none; max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.document-item button { background: none; border: none; color: #e74c3c; cursor: pointer; font-size: 18px; line-height: 1; }
 </style>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, doc, setDoc, updateDoc, query, where, deleteDoc } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
+// NOVAS IMPORTAÇÕES PARA FIREBASE STORAGE
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-storage.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyAFJJAqVf3ge0WDHBpmS9E6sXKvnjuFkhw",
@@ -110,6 +119,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
+// INICIALIZAÇÃO DO FIREBASE STORAGE
+const storage = getStorage(app);
 
 window.firebaseDB = db;
 
@@ -124,6 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const STATUS=['lista-fria','negociacao','contrato-assinado','fechado'];
     const cardsMap={};
     const modalBackdrop=document.getElementById('modalBackdrop');
+    const documentModalBackdrop=document.getElementById('documentModalBackdrop'); // NOVA MODAL
     const clientForm=document.getElementById('clientForm');
     const inputNome=document.getElementById('inputNome');
     const inputCPF=document.getElementById('inputCPF');
@@ -141,6 +153,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const toastEl=document.getElementById('toast');
     const coinSound=document.getElementById('coinSound');
     const processosContainer=document.getElementById('processosContainer');
+    
+    // Elementos do Document Modal
+    const docFile=document.getElementById('docFile');
+    const docName=document.getElementById('docName');
+    const btnUploadDoc=document.getElementById('btnUploadDoc');
+    const documentList=document.getElementById('documentList');
+    const documentModalTitle=document.getElementById('documentModalTitle');
+    let currentClienteDocId = null; // Para saber qual cliente estamos anexando documentos
 
     let currentUser=null;
 
@@ -211,6 +231,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function closeModal(){ modalBackdrop.style.display='none'; }
+    function closeDocumentModal(){ 
+        documentModalBackdrop.style.display='none'; 
+        // Limpar inputs da modal de doc
+        docFile.value = '';
+        docName.value = '';
+    }
 
     function addProcessoField(value=""){
         const row = document.createElement('div');
@@ -257,27 +283,33 @@ document.addEventListener('DOMContentLoaded', () => {
         const colorBar=document.createElement('div'); colorBar.className='color-bar'; card.appendChild(colorBar);
 
         const actionsDiv=document.createElement('div'); actionsDiv.className='card-actions';
+        const btnDoc=document.createElement('button'); // NOVO BOTÃO DE DOCUMENTOS
+        btnDoc.onclick=(e)=>{ e.stopPropagation(); openDocumentModal(cliente); };
+        btnDoc.innerHTML='<img src="https://img.icons8.com/ios-filled/30/000000/document.png"/>';
+        
         const btnCall=document.createElement('button');
         btnCall.onclick=(e)=>{ e.stopPropagation(); ligar(cliente.numeros||''); };
         btnCall.innerHTML='<img src="https://img.icons8.com/ios-glyphs/30/000000/phone.png"/>';
         const btnWa=document.createElement('button');
         btnWa.onclick=(e)=>{ e.stopPropagation(); whatsapp(cliente.numeros||''); };
         btnWa.innerHTML='<img src="https://img.icons8.com/ios-glyphs/30/000000/whatsapp.png"/>';
-        actionsDiv.appendChild(btnCall); actionsDiv.appendChild(btnWa); card.appendChild(actionsDiv);
+        
+        actionsDiv.appendChild(btnDoc); // Adiciona o botão de documentos
+        actionsDiv.appendChild(btnCall); 
+        actionsDiv.appendChild(btnWa); 
+        card.appendChild(actionsDiv);
 
         const contentDiv=document.createElement('div'); contentDiv.className='card-content';
         const processosArray = cliente.processo ? cliente.processo.split(',').map(p=>p.trim()) : [];
         const primeiroProcesso = processosArray.length > 0 ? processosArray[0] : '-';
         
         // CORREÇÃO PRINCIPAL: Adicionado de volta o nome do cliente (h3)
-        contentDiv.innerHTML=`
-            <h3>${cliente.nome}</h3> 
+        contentDiv.innerHTML=`            <h3>${cliente.nome}</h3> 
             <p>CPF: ${cliente.cpf||'-'}</p>
             <p>Classe: ${cliente.classe||'-'}</p>
             <p>Processo: ${primeiroProcesso}</p>
             <p>Valor: R$ ${cliente.valor||'0,00'}</p>
-            <p>Andamento: ${cliente.andamento || '-'}</p>`; 
-        card.appendChild(contentDiv);
+            <p>Andamento: ${cliente.andamento || '-'}</p>`;         card.appendChild(contentDiv);
 
         card.onclick=()=>openModal(true,cliente);
         addDragEvents(card);
@@ -301,6 +333,122 @@ document.addEventListener('DOMContentLoaded', () => {
         filtragemAplicada();
     }
 
+    // ========= LÓGICA DE DOCUMENTOS =========
+    
+    // Abre a modal de documentos e preenche a lista
+    function openDocumentModal(clienteData){
+        currentClienteDocId = clienteData.id;
+        documentModalTitle.innerText = `Documentos de: ${clienteData.nome}`;
+        renderDocumentos(clienteData);
+        documentModalBackdrop.style.display='flex';
+    }
+    
+    // Renderiza a lista de documentos na modal
+    function renderDocumentos(clienteData){
+        documentList.innerHTML = '';
+        const documentos = clienteData.documentos || [];
+        
+        if(documentos.length === 0){
+            documentList.innerHTML = '<p style="text-align:center; color:#777;">Nenhum documento anexado.</p>';
+            return;
+        }
+
+        documentos.forEach(doc => {
+            const item = document.createElement('div');
+            item.className = 'document-item';
+            
+            const link = document.createElement('a');
+            link.href = doc.url;
+            link.target = '_blank';
+            link.title = doc.nome;
+            link.textContent = doc.nome;
+            
+            const btnDeleteDoc = document.createElement('button');
+            btnDeleteDoc.innerHTML = '&times;';
+            btnDeleteDoc.onclick = (e) => {
+                e.stopPropagation();
+                deleteDocumento(clienteData.id, doc.nome, clienteData);
+            };
+
+            item.appendChild(link);
+            item.appendChild(btnDeleteDoc);
+            documentList.appendChild(item);
+        });
+    }
+
+    // Faz o upload do arquivo para o Storage e atualiza o Firestore
+    async function uploadFile(clienteId, file, nomeDoc){
+        if(!currentUser || !file || !clienteId) return;
+
+        try {
+            showToast(`Iniciando upload de ${nomeDoc}...`);
+            
+            const storageRef = ref(storage, `${currentUser.uid}/${clienteId}/${nomeDoc}_${Date.now()}_${file.name}`);
+            const snapshot = await uploadBytes(storageRef, file);
+            const downloadURL = await getDownloadURL(snapshot.ref);
+
+            // Atualiza o Firestore com o metadado do documento
+            const docRef = doc(db, "clientes", clienteId);
+            
+            // Recupera o cliente atual para pegar a lista de documentos e evitar sobrescrever
+            const allClients = await getClientes();
+            const currentClientData = allClients.find(c => c.id === clienteId);
+            
+            const novosDocumentos = [...(currentClientData.documentos || []), { nome: nomeDoc, url: downloadURL, fileRef: snapshot.ref.fullPath }];
+            
+            await updateDoc(docRef, { documentos: novosDocumentos });
+            showToast("Documento enviado e salvo!");
+            
+            // Atualiza a modal
+            currentClientData.documentos = novosDocumentos;
+            renderDocumentos(currentClientData);
+            
+        } catch (error) {
+            console.error("Erro ao fazer upload: ", error);
+            showToast("Erro ao enviar documento.");
+        }
+    }
+
+    // Lógica para remover o documento
+    async function deleteDocumento(clienteId, docName, clienteData){
+        if(!confirm(`Tem certeza que deseja remover o documento "${docName}"?`)) return;
+
+        try {
+            const docRef = doc(db, "clientes", clienteId);
+            
+            // Filtra a lista para remover o documento
+            const novosDocumentos = (clienteData.documentos || []).filter(doc => doc.nome !== docName);
+            
+            await updateDoc(docRef, { documentos: novosDocumentos });
+            showToast("Documento removido da lista!");
+            
+            // Atualiza a modal (opcional: o ideal seria também deletar do Storage, mas é mais complexo)
+            clienteData.documentos = novosDocumentos;
+            renderDocumentos(clienteData);
+
+        } catch (error) {
+            console.error("Erro ao remover documento: ", error);
+            showToast("Erro ao remover documento.");
+        }
+    }
+    
+    // Listener para o upload de documentos
+    btnUploadDoc.onclick = async () => {
+        const file = docFile.files[0];
+        const nome = docName.value.trim();
+        
+        if (!currentClienteDocId) { showToast("Cliente não selecionado."); return; }
+        if (!file) { showToast("Selecione um arquivo."); return; }
+        if (!nome) { showToast("Informe o nome do documento."); return; }
+
+        await uploadFile(currentClienteDocId, file, nome);
+        
+        // Limpa os inputs após o upload
+        docFile.value = '';
+        docName.value = '';
+    };
+    // ========= FIM LÓGICA DE DOCUMENTOS =========
+
     clientForm.onsubmit = async function(e){
         e.preventDefault();
         const nome = inputNome.value.trim();
@@ -319,6 +467,7 @@ document.addEventListener('DOMContentLoaded', () => {
             classe: inputClasse.value,
             valor: inputValor.value, // Valor agora é salvo como string (aceita qualquer formato)
             andamento: inputAndamento.value.trim() // Salva o novo campo
+            // O campo 'documentos' será adicionado/atualizado apenas pela modal de documentos
         };
 
         if(clientForm.dataset.editId){
@@ -336,6 +485,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnAdd.onclick=()=>openModal();
     btnCancel.onclick=()=>closeModal();
+    document.getElementById('btnCancelDoc').onclick=()=>closeDocumentModal(); // Botão cancelar da modal de documentos
 
     let draggedCard=null;
     function addDragEvents(card){
@@ -449,6 +599,32 @@ document.addEventListener('DOMContentLoaded', () => {
 </form>
 </div>
 </div>
+
+<div class="modal-backdrop" id="documentModalBackdrop">
+<div class="modal" id="documentModal">
+<h3 id="documentModalTitle">Documentos do Cliente</h3>
+<div>
+    <h4>Anexar Novo Documento</h4>
+    <div class="row"><input type="text" id="docName" placeholder="Nome do Documento (Ex: RG, Contrato)" /></div>
+    <div class="row"><input type="file" id="docFile" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" /></div>
+    <div class="row"><button type="button" class="btn primary" id="btnUploadDoc" style="width: 100%;">Upload e Salvar Documento</button></div>
+</div>
+
+<hr style="margin: 15px 0; border: 0; border-top: 1px solid #eee;">
+
+<div>
+    <h4>Documentos Anexados</h4>
+    <div id="documentList">
+            </div>
+</div>
+
+<div class="actions" style="justify-content: flex-end; margin-top: 20px;">
+    <button type="button" class="btn ghost" id="btnCancelDoc">Fechar</button>
+</div>
+
+</div>
+</div>
+
 
 <div class="toast" id="toast"></div>
 <audio id="coinSound" src="https://assets.mixkit.co/sfx/preview/mixkit-winning-notification-2018.mp3" preload="auto"></audio>
